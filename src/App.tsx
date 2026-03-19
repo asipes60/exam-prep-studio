@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
+import { AuthProvider } from "./hooks/use-auth";
 import { ExamPrepProvider } from "./contexts/ExamPrepContext";
 import ExamPrepLayout from "./components/exam-prep/ExamPrepLayout";
 import ExamPrepLanding from "./pages/exam-prep/ExamPrepLanding";
@@ -31,6 +32,7 @@ function App() {
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <AuthProvider>
             <ExamPrepProvider>
               <Routes>
                 <Route element={<ExamPrepLayout />}>
@@ -44,6 +46,7 @@ function App() {
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </ExamPrepProvider>
+            </AuthProvider>
           </BrowserRouter>
         </TooltipProvider>
       </QueryClientProvider>

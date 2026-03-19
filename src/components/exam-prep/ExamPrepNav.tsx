@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { useExamPrep } from '@/contexts/ExamPrepContext';
+import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import {
   BookOpen,
@@ -15,7 +15,7 @@ import {
 import { useState } from 'react';
 
 export default function ExamPrepNav() {
-  const { user, isAuthenticated, logout } = useExamPrep();
+  const { user, isAuthenticated, signOut } = useAuth();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -28,6 +28,10 @@ export default function ExamPrepNav() {
   ];
 
   const isActive = (path: string) => location.pathname === path;
+
+  function handleSignOut() {
+    signOut();
+  }
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-slate-200">
@@ -70,13 +74,8 @@ export default function ExamPrepNav() {
               <span className="text-sm text-slate-500 flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5" />
                 {user?.name}
-                {user?.isGuest && (
-                  <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
-                    Guest
-                  </span>
-                )}
               </span>
-              <Button variant="ghost" size="sm" onClick={logout} className="text-slate-500">
+              <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-slate-500">
                 <LogOut className="w-4 h-4" />
               </Button>
             </>
@@ -121,10 +120,8 @@ export default function ExamPrepNav() {
           <div className="mt-3 pt-3 border-t border-slate-100">
             {isAuthenticated ? (
               <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-500">
-                  {user?.name} {user?.isGuest && '(Guest)'}
-                </span>
-                <Button variant="ghost" size="sm" onClick={logout}>
+                <span className="text-sm text-slate-500">{user?.name}</span>
+                <Button variant="ghost" size="sm" onClick={handleSignOut}>
                   Sign Out
                 </Button>
               </div>

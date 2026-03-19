@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import type {
   LicenseType,
   StudyFormat,
@@ -6,7 +6,6 @@ import type {
   GeneratedContent,
   SavedMaterial,
   Folder,
-  UserProfile,
   QuizSession,
   StudyMode,
 } from '@/types/exam-prep';
@@ -14,14 +13,6 @@ import * as storage from '@/lib/exam-prep-storage';
 import { generateStudyMaterial } from '@/lib/exam-prep-ai';
 
 interface ExamPrepState {
-  // User
-  user: UserProfile | null;
-  isAuthenticated: boolean;
-  login: (email: string, password: string) => void;
-  signup: (name: string, email: string, password: string) => void;
-  loginAsGuest: () => void;
-  logout: () => void;
-
   // Generator
   selectedLicense: LicenseType | null;
   setSelectedLicense: (license: LicenseType | null) => void;
@@ -51,7 +42,6 @@ interface ExamPrepState {
 const ExamPrepContext = createContext<ExamPrepState | null>(null);
 
 export function ExamPrepProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<UserProfile | null>(() => storage.getUser());
   const [selectedLicense, setSelectedLicense] = useState<LicenseType | null>(null);
   const [generatorConfig, setGeneratorConfig] = useState<Partial<GeneratorConfig>>({});
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
@@ -60,44 +50,6 @@ export function ExamPrepProvider({ children }: { children: React.ReactNode }) {
   const [folders, setFolders] = useState<Folder[]>(() => storage.getFolders());
   const [activeQuiz, setActiveQuiz] = useState<QuizSession | null>(null);
   const [studyMode, setStudyMode] = useState<StudyMode>('study');
-
-  const isAuthenticated = user !== null;
-
-  const login = useCallback((email: string, _password: string) => {
-    // TODO: Replace with real auth (Firebase/Supabase)
-    const profile: UserProfile = {
-      id: `user-${Date.now()}`,
-      email,
-      name: email.split('@')[0],
-      createdAt: new Date().toISOString(),
-      isGuest: false,
-    };
-    storage.saveUser(profile);
-    setUser(profile);
-  }, []);
-
-  const signup = useCallback((name: string, email: string, _password: string) => {
-    // TODO: Replace with real auth
-    const profile: UserProfile = {
-      id: `user-${Date.now()}`,
-      email,
-      name,
-      createdAt: new Date().toISOString(),
-      isGuest: false,
-    };
-    storage.saveUser(profile);
-    setUser(profile);
-  }, []);
-
-  const loginAsGuest = useCallback(() => {
-    const guest = storage.createGuestUser();
-    setUser(guest);
-  }, []);
-
-  const logout = useCallback(() => {
-    storage.clearUser();
-    setUser(null);
-  }, []);
 
   const updateGeneratorConfig = useCallback((updates: Partial<GeneratorConfig>) => {
     setGeneratorConfig((prev) => ({ ...prev, ...updates }));
@@ -151,12 +103,6 @@ export function ExamPrepProvider({ children }: { children: React.ReactNode }) {
   return (
     <ExamPrepContext.Provider
       value={{
-        user,
-        isAuthenticated,
-        login,
-        signup,
-        loginAsGuest,
-        logout,
         selectedLicense,
         setSelectedLicense,
         generatorConfig,

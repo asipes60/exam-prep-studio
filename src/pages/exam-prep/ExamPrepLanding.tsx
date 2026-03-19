@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useExamPrep } from '@/contexts/ExamPrepContext';
+import { useAuth } from '@/hooks/use-auth';
 import { EXAM_DATA, STUDY_FORMAT_OPTIONS } from '@/data/exam-prep-data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -30,7 +31,8 @@ const iconMap: Record<string, React.ElementType> = {
 const featureIcons = [Sparkles, Brain, FileText, Layers, Clock, Award];
 
 export default function ExamPrepLanding() {
-  const { setSelectedLicense, isAuthenticated } = useExamPrep();
+  const { setSelectedLicense } = useExamPrep();
+  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   function handleExamSelect(license: LicenseType) {
