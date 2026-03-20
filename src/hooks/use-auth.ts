@@ -55,43 +55,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Safety timeout — never spin longer than 5 seconds
-    const timeout = setTimeout(() => {
-      console.warn('Auth loading timeout — forcing loaded state');
-      setLoading(false);
-    }, 5000);
-
-    // Get initial session
-    console.log('[Auth] Fetching session...');
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      console.log('[Auth] Session result:', currentSession ? 'has session' : 'no session');
-      clearTimeout(timeout);
-      setSession(currentSession);
-      if (currentSession?.user) {
-        fetchProfile(currentSession.user.id).then((profile) => {
-          console.log('[Auth] Profile loaded:', profile?.email);
-          setUser(profile);
-          setLoading(false);
-        }).catch((err) => {
-          console.error('[Auth] Profile fetch error:', err);
-          setLoading(false);
-        });
-      } else {
-        setLoading(false);
-      }
-    }).catch((err) => {
-      console.error('[Auth] Session error:', err);
-      clearTimeout(timeout);
-      setLoading(false);
-    });
-
-    // Listen for auth state changes
+    // Use onAuthStateChange exclusively — avoids navigator.locks hang in supabase-js v2.39+
+    // The INITIAL_SESSION event fires immediately with the current session (or null).
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, newSession) => {
+      async (event, newSession) => {
+        console.log('[Auth] Event:', event, newSession ? 'has session' : 'no session');
         setSession(newSession);
         if (newSession?.user) {
           try {
             const profile = await fetchProfile(newSession.user.id);
+            console.log('[Auth] Profile loaded:', profile?.email);
             setUser(profile);
           } catch {
             setUser(null);
@@ -103,7 +76,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
+    // Safety timeout in case INITIAL_SESSION never fires
+    const timeout = setTimeout(() => {
+      console.warn('[Auth] Timeout — forcing loaded state');
+      setLoading(false);
+    }, 5000);
+
     return () => {
+      clearTimeout(timeout);
       subscription.unsubscribe();
     };
   }, []);
