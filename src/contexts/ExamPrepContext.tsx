@@ -11,6 +11,7 @@ import type {
 } from '@/types/exam-prep';
 import * as storage from '@/lib/exam-prep-storage';
 import { generateStudyMaterial } from '@/lib/exam-prep-ai';
+import { useAuth } from '@/hooks/use-auth';
 
 interface ExamPrepState {
   // Generator
@@ -21,6 +22,7 @@ interface ExamPrepState {
   generatedContent: GeneratedContent | null;
   isGenerating: boolean;
   generateContent: (config: GeneratorConfig) => Promise<void>;
+  latestAuditEntryId: string | null;
 
   // Saved Materials
   savedMaterials: SavedMaterial[];
@@ -42,10 +44,12 @@ interface ExamPrepState {
 const ExamPrepContext = createContext<ExamPrepState | null>(null);
 
 export function ExamPrepProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [selectedLicense, setSelectedLicense] = useState<LicenseType | null>(null);
   const [generatorConfig, setGeneratorConfig] = useState<Partial<GeneratorConfig>>({});
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [latestAuditEntryId, setLatestAuditEntryId] = useState<string | null>(null);
   const [savedMaterials, setSavedMaterials] = useState<SavedMaterial[]>(() => storage.getSavedMaterials());
   const [folders, setFolders] = useState<Folder[]>(() => storage.getFolders());
   const [activeQuiz, setActiveQuiz] = useState<QuizSession | null>(null);
@@ -58,15 +62,17 @@ export function ExamPrepProvider({ children }: { children: React.ReactNode }) {
   const generateContent = useCallback(async (config: GeneratorConfig) => {
     setIsGenerating(true);
     setGeneratedContent(null);
+    setLatestAuditEntryId(null);
     try {
-      const content = await generateStudyMaterial(config);
-      setGeneratedContent(content);
+      const result = await generateStudyMaterial(config, user?.id);
+      setGeneratedContent(result.content);
+      setLatestAuditEntryId(result.auditEntryId);
     } catch (err) {
       console.error('Generation failed:', err);
     } finally {
       setIsGenerating(false);
     }
-  }, []);
+  }, [user?.id]);
 
   const handleSaveMaterial = useCallback((material: SavedMaterial) => {
     storage.saveMaterial(material);
@@ -110,6 +116,7 @@ export function ExamPrepProvider({ children }: { children: React.ReactNode }) {
         generatedContent,
         isGenerating,
         generateContent,
+        latestAuditEntryId,
         savedMaterials,
         folders,
         saveMaterial: handleSaveMaterial,

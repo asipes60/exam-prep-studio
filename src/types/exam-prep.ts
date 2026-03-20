@@ -5,6 +5,7 @@ export type LicenseType = 'LPCC' | 'LMFT' | 'LCSW' | 'LAW_ETHICS';
 export type StudyFormat =
   | 'practice_questions'
   | 'scenario_questions'
+  | 'clinical_vignette'
   | 'flashcards'
   | 'study_guide'
   | 'quick_reference'
@@ -107,6 +108,24 @@ export interface StudyPlan {
   weakAreas: string[];
 }
 
+export interface ClinicalVignetteQuestion {
+  questionText: string;
+  competencyArea: string;
+  choices: { label: string; text: string }[];
+  correctAnswer: string;
+  rationale: string;
+  incorrectRationales: { label: string; explanation: string }[];
+}
+
+export interface ClinicalVignette {
+  id: string;
+  clientPresentation: string;
+  demographics: string;
+  presentingProblem: string;
+  relevantHistory: string;
+  questions: ClinicalVignetteQuestion[];
+}
+
 export interface QuizResult {
   questionId: string;
   selectedAnswer: string;
@@ -128,6 +147,7 @@ export interface QuizSession {
 export type GeneratedContent =
   | { type: 'practice_questions'; data: PracticeQuestion[] }
   | { type: 'scenario_questions'; data: PracticeQuestion[] }
+  | { type: 'clinical_vignette'; data: ClinicalVignette[] }
   | { type: 'flashcards'; data: Flashcard[] }
   | { type: 'study_guide'; data: StudyGuide }
   | { type: 'quick_reference'; data: QuickReference }

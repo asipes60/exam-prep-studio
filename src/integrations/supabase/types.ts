@@ -19,6 +19,7 @@ export type Database = {
           stripe_customer_id: string | null
           daily_generations: number
           daily_generations_reset_at: string
+          is_admin: boolean
           created_at: string
           updated_at: string
         }
@@ -31,6 +32,7 @@ export type Database = {
           stripe_customer_id?: string | null
           daily_generations?: number
           daily_generations_reset_at?: string
+          is_admin?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -43,6 +45,7 @@ export type Database = {
           stripe_customer_id?: string | null
           daily_generations?: number
           daily_generations_reset_at?: string
+          is_admin?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -261,6 +264,117 @@ export type Database = {
             foreignKeyName: "subscriptions_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+    }
+      admin_knowledge_base: {
+        Row: {
+          id: string
+          title: string
+          category: string
+          content: string
+          source_url: string | null
+          tags: string[]
+          license_types: string[]
+          topics: string[]
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          category: string
+          content: string
+          source_url?: string | null
+          tags?: string[]
+          license_types?: string[]
+          topics?: string[]
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          category?: string
+          content?: string
+          source_url?: string | null
+          tags?: string[]
+          license_types?: string[]
+          topics?: string[]
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      audit_log: {
+        Row: {
+          id: string
+          user_id: string
+          prompt_text: string | null
+          output_text: string | null
+          system_prompt: string | null
+          license_type: string | null
+          study_format: string | null
+          topic: string | null
+          difficulty: string | null
+          model_used: string | null
+          tokens_in: number | null
+          tokens_out: number | null
+          generation_time_ms: number | null
+          flagged: boolean
+          flag_reason: string | null
+          admin_notes: string | null
+          kb_entries_used: string[]
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          prompt_text?: string | null
+          output_text?: string | null
+          system_prompt?: string | null
+          license_type?: string | null
+          study_format?: string | null
+          topic?: string | null
+          difficulty?: string | null
+          model_used?: string | null
+          tokens_in?: number | null
+          tokens_out?: number | null
+          generation_time_ms?: number | null
+          flagged?: boolean
+          flag_reason?: string | null
+          admin_notes?: string | null
+          kb_entries_used?: string[]
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          prompt_text?: string | null
+          output_text?: string | null
+          system_prompt?: string | null
+          license_type?: string | null
+          study_format?: string | null
+          topic?: string | null
+          difficulty?: string | null
+          model_used?: string | null
+          tokens_in?: number | null
+          tokens_out?: number | null
+          generation_time_ms?: number | null
+          flagged?: boolean
+          flag_reason?: string | null
+          admin_notes?: string | null
+          kb_entries_used?: string[]
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           }

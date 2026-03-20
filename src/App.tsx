@@ -14,6 +14,11 @@ import ExamPrepAssessment from "./pages/exam-prep/ExamPrepAssessment";
 import ExamPrepQuiz from "./pages/exam-prep/ExamPrepQuiz";
 import ExamPrepSaved from "./pages/exam-prep/ExamPrepSaved";
 import ExamPrepAuth from "./pages/exam-prep/ExamPrepAuth";
+import AdminGuard from "./components/admin/AdminGuard";
+import AdminLayout from "./components/admin/AdminLayout";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminKnowledgeBase from "./pages/admin/AdminKnowledgeBase";
+import AdminAuditLog from "./pages/admin/AdminAuditLog";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -42,6 +47,13 @@ function App() {
                   <Route path="/quiz" element={<ExamPrepQuiz />} />
                   <Route path="/saved" element={<ExamPrepSaved />} />
                   <Route path="/auth" element={<ExamPrepAuth />} />
+                </Route>
+                <Route element={<AdminGuard />}>
+                  <Route element={<AdminLayout />}>
+                    <Route path="/admin" element={<AdminDashboard />} />
+                    <Route path="/admin/kb" element={<AdminKnowledgeBase />} />
+                    <Route path="/admin/audit" element={<AdminAuditLog />} />
+                  </Route>
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>

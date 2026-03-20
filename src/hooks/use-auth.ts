@@ -11,6 +11,7 @@ export interface UserProfile {
   subscriptionStatus: 'free' | 'pro' | 'cancelled';
   dailyGenerations: number;
   dailyGenerationsResetAt: string;
+  isAdmin: boolean;
 }
 
 interface AuthContextValue {
@@ -30,7 +31,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 async function fetchProfile(userId: string): Promise<UserProfile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, email, name, preferred_license, subscription_status, daily_generations, daily_generations_reset_at')
+    .select('id, email, name, preferred_license, subscription_status, daily_generations, daily_generations_reset_at, is_admin')
     .eq('id', userId)
     .single();
 
@@ -44,6 +45,7 @@ async function fetchProfile(userId: string): Promise<UserProfile | null> {
     subscriptionStatus: data.subscription_status as 'free' | 'pro' | 'cancelled',
     dailyGenerations: data.daily_generations,
     dailyGenerationsResetAt: data.daily_generations_reset_at,
+    isAdmin: (data as any).is_admin ?? false,
   };
 }
 

@@ -5,6 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import type {
   GeneratedContent,
   PracticeQuestion,
@@ -12,6 +19,7 @@ import type {
   StudyGuide,
   QuickReference,
   StudyPlan,
+  ClinicalVignette,
   SavedMaterial,
 } from '@/types/exam-prep';
 import {
@@ -26,8 +34,10 @@ import {
   Bookmark,
   Loader2,
   FileText,
+  Flag,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { flagAuditEntry } from '@/lib/audit-log';
 
 function QuestionsView({ questions, showRationales }: { questions: PracticeQuestion[]; showRationales?: boolean }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -313,8 +323,141 @@ function StudyPlanView({ plan }: { plan: StudyPlan }) {
   );
 }
 
+function ClinicalVignetteView({ vignettes }: { vignettes: ClinicalVignette[] }) {
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
+  const [expandedRationales, setExpandedRationales] = useState<Record<string, boolean>>({});
+
+  function selectAnswer(key: string, label: string) {
+    setSelectedAnswers((prev) => ({ ...prev, [key]: label }));
+  }
+
+  function toggleRationale(key: string) {
+    setExpandedRationales((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  return (
+    <div className="space-y-8">
+      {vignettes.map((vignette, vi) => (
+        <div key={vignette.id} className="space-y-4">
+          {/* Client Presentation Card */}
+          <Card className="border-blue-200 bg-blue-50/30">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center">
+                  {vi + 1}
+                </span>
+                <h3 className="font-montserrat font-semibold text-slate-900">Clinical Vignette</h3>
+              </div>
+              <p className="text-sm text-slate-800 leading-relaxed mb-4">{vignette.clientPresentation}</p>
+              <div className="grid sm:grid-cols-3 gap-3">
+                <div className="bg-white rounded-lg p-3 border border-blue-100">
+                  <p className="text-xs font-semibold text-slate-500 mb-1">Demographics</p>
+                  <p className="text-sm text-slate-700">{vignette.demographics}</p>
+                </div>
+                <div className="bg-white rounded-lg p-3 border border-blue-100">
+                  <p className="text-xs font-semibold text-slate-500 mb-1">Presenting Problem</p>
+                  <p className="text-sm text-slate-700">{vignette.presentingProblem}</p>
+                </div>
+                <div className="bg-white rounded-lg p-3 border border-blue-100">
+                  <p className="text-xs font-semibold text-slate-500 mb-1">Relevant History</p>
+                  <p className="text-sm text-slate-700">{vignette.relevantHistory}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Questions */}
+          {vignette.questions.map((q, qi) => {
+            const key = `${vignette.id}-q${qi}`;
+            const selected = selectedAnswers[key];
+            const hasAnswered = !!selected;
+            const isCorrect = selected === q.correctAnswer;
+            const isRationaleExpanded = expandedRationales[key];
+
+            return (
+              <Card key={key} className="border-slate-200 ml-4">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold flex items-center justify-center">
+                      {qi + 1}
+                    </span>
+                    <Badge className="bg-purple-100 text-purple-700 text-xs">{q.competencyArea}</Badge>
+                  </div>
+
+                  <p className="text-sm text-slate-800 leading-relaxed mb-4">{q.questionText}</p>
+
+                  <div className="space-y-2">
+                    {q.choices.map((choice) => {
+                      const isSelected = selected === choice.label;
+                      const isCorrectChoice = choice.label === q.correctAnswer;
+                      let choiceStyle = 'border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 cursor-pointer';
+                      if (hasAnswered) {
+                        if (isCorrectChoice) choiceStyle = 'border-emerald-300 bg-emerald-50';
+                        else if (isSelected && !isCorrect) choiceStyle = 'border-red-300 bg-red-50';
+                        else choiceStyle = 'border-slate-200 opacity-60';
+                      }
+
+                      return (
+                        <button
+                          key={choice.label}
+                          className={`w-full text-left p-3 rounded-lg border text-sm transition-all ${choiceStyle}`}
+                          onClick={() => !hasAnswered && selectAnswer(key, choice.label)}
+                          disabled={hasAnswered}
+                        >
+                          <div className="flex items-start gap-2">
+                            <span className="font-semibold text-slate-500 shrink-0">{choice.label}.</span>
+                            <span className="text-slate-700">{choice.text}</span>
+                            {hasAnswered && isCorrectChoice && (
+                              <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 ml-auto" />
+                            )}
+                            {hasAnswered && isSelected && !isCorrect && (
+                              <XCircle className="w-4 h-4 text-red-500 shrink-0 ml-auto" />
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {hasAnswered && (
+                    <div className="mt-4">
+                      <button
+                        className="flex items-center gap-1 text-sm text-blue-600 font-medium"
+                        onClick={() => toggleRationale(key)}
+                      >
+                        {isRationaleExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        {isRationaleExpanded ? 'Hide' : 'Show'} Rationale
+                      </button>
+                      {isRationaleExpanded && (
+                        <div className="mt-3 p-4 bg-slate-50 rounded-lg text-sm space-y-3">
+                          <div>
+                            <p className="font-semibold text-emerald-700 mb-1">Correct Answer: {q.correctAnswer}</p>
+                            <p className="text-slate-700">{q.rationale}</p>
+                          </div>
+                          {q.incorrectRationales.map((ir) => (
+                            <div key={ir.label}>
+                              <p className="font-medium text-slate-500">Why not {ir.label}:</p>
+                              <p className="text-slate-600">{ir.explanation}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function GeneratorOutputPanel() {
-  const { generatedContent, isGenerating, selectedLicense, saveMaterial } = useExamPrep();
+  const { generatedContent, isGenerating, selectedLicense, saveMaterial, latestAuditEntryId } = useExamPrep();
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reportReason, setReportReason] = useState('');
 
   function handleSave() {
     if (!generatedContent || !selectedLicense) return;
@@ -342,6 +485,21 @@ export default function GeneratorOutputPanel() {
 
   function handlePrint() {
     window.print();
+  }
+
+  async function handleReportInaccuracy() {
+    if (!latestAuditEntryId || !reportReason.trim()) {
+      toast.error('Please provide a reason for the report');
+      return;
+    }
+    const success = await flagAuditEntry(latestAuditEntryId, reportReason.trim());
+    if (success) {
+      toast.success('Inaccuracy reported — thank you for helping improve content quality');
+      setReportDialogOpen(false);
+      setReportReason('');
+    } else {
+      toast.error('Failed to submit report. You may need to be signed in.');
+    }
   }
 
   if (isGenerating) {
@@ -382,6 +540,12 @@ export default function GeneratorOutputPanel() {
           Generated Materials
         </h3>
         <div className="flex items-center gap-2">
+          {latestAuditEntryId && (
+            <Button variant="outline" size="sm" onClick={() => setReportDialogOpen(true)} className="text-amber-600 border-amber-200 hover:bg-amber-50">
+              <Flag className="w-3.5 h-3.5 mr-1.5" />
+              Report Inaccuracy
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={handleCopy}>
             <Copy className="w-3.5 h-3.5 mr-1.5" />
             Copy
@@ -408,6 +572,30 @@ export default function GeneratorOutputPanel() {
         It does not replace official exam prep materials, legal consultation, or clinical supervision.
         Always verify legal and regulatory information with authoritative California sources.
       </div>
+
+      {/* Report Inaccuracy Dialog */}
+      <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Report Inaccuracy</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-600">
+            Help improve content quality by flagging inaccurate information. Describe what's wrong:
+          </p>
+          <Textarea
+            value={reportReason}
+            onChange={(e) => setReportReason(e.target.value)}
+            rows={4}
+            placeholder="e.g., The statute cited doesn't exist, the correct answer rationale is wrong because..."
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setReportDialogOpen(false)}>Cancel</Button>
+            <Button className="bg-amber-600 hover:bg-amber-700" onClick={handleReportInaccuracy}>
+              Submit Report
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -421,6 +609,8 @@ function renderContent(content: GeneratedContent) {
     case 'law_ethics_spotter':
     case 'rationale_review':
       return <QuestionsView questions={content.data} />;
+    case 'clinical_vignette':
+      return <ClinicalVignetteView vignettes={content.data} />;
     case 'flashcards':
       return <FlashcardsView cards={content.data} />;
     case 'study_guide':
@@ -442,6 +632,8 @@ function getContentTitle(content: GeneratedContent): string {
       return content.data.title;
     case 'study_plan':
       return content.data.title;
+    case 'clinical_vignette':
+      return `Clinical Vignettes — ${content.data[0]?.presentingProblem || 'General'}`;
     default:
       if (Array.isArray(content.data) && content.data.length > 0) {
         return `${content.type.replace(/_/g, ' ')} — ${content.data[0]?.topic || 'General'}`;
@@ -458,6 +650,8 @@ function getContentTopic(content: GeneratedContent): string {
       return content.data.topic;
     case 'study_plan':
       return content.data.weakAreas.join(', ');
+    case 'clinical_vignette':
+      return content.data[0]?.presentingProblem || 'General';
     default:
       if (Array.isArray(content.data) && content.data.length > 0) {
         return content.data[0]?.topic || 'General';

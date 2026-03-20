@@ -21,9 +21,12 @@ import type {
   StudyGuide,
   StudyPlan,
   QuickReference,
+  ClinicalVignette,
   LicenseType,
 } from '@/types/exam-prep';
-import { EXAM_DATA, getSeedQuestions, getSeedFlashcards, getSeedStudyGuide, getSeedStudyPlan } from '@/data/exam-prep-data';
+import { EXAM_DATA, getSeedQuestions, getSeedFlashcards, getSeedStudyGuide, getSeedStudyPlan, getSeedVignettes } from '@/data/exam-prep-data';
+import { getRelevantKBEntries, formatKBForPrompt } from '@/lib/kb-retrieval';
+import { logGeneration } from '@/lib/audit-log';
 
 // Simulated delay for realistic UX
 function delay(ms: number): Promise<void> {
@@ -37,9 +40,10 @@ function generateId(): string {
 // ─── System Prompt Builder ──────────────────────────────────────────────
 // This builds the system context for AI generation calls.
 
-export function buildSystemPrompt(config: GeneratorConfig): string {
+export function buildSystemPrompt(config: GeneratorConfig, kbContext?: string): string {
   const exam = EXAM_DATA[config.licenseType];
-  return `You are an expert clinical exam preparation assistant for California mental health licensure.
+
+  let prompt = `You are an expert clinical exam preparation assistant for California mental health licensure.
 
 CONTEXT:
 - Exam: ${exam.title} (${exam.id})
@@ -59,6 +63,24 @@ GUIDELINES:
 
 DISCLAIMER TO INCLUDE:
 This content is for educational study purposes only and does not replace official exam prep materials, legal consultation, or clinical supervision.`;
+
+  if (config.studyFormat === 'clinical_vignette') {
+    prompt += `
+
+CLINICAL VIGNETTE INSTRUCTIONS:
+- Create a realistic, paragraph-length client presentation with demographics, presenting problem, and relevant history.
+- Follow each vignette with 4-6 questions testing different competency areas (diagnosis, treatment planning, ethics, risk assessment, cultural competence).
+- Each question should have 4 answer choices with detailed rationales for correct and incorrect answers.
+- Difficulty scaling: beginner = straightforward cases, intermediate = some complexity, exam_level = nuanced cases with competing clinical priorities.
+- Ensure vignettes reflect diverse client populations and clinical settings.`;
+  }
+
+  // Inject KB context if available
+  if (kbContext) {
+    prompt += kbContext;
+  }
+
+  return prompt;
 }
 
 // ─── Mock Generator Functions ───────────────────────────────────────────
@@ -140,33 +162,116 @@ async function generateStudyPlan(config: GeneratorConfig): Promise<StudyPlan> {
   return getSeedStudyPlan(config.licenseType, config.topic ? [config.topic] : []);
 }
 
+async function generateClinicalVignettes(config: GeneratorConfig): Promise<ClinicalVignette[]> {
+  // TODO: GEMINI API CALL — replace mock with Gemini when ready
+  await delay(2000 + Math.random() * 1000);
+  const seed = getSeedVignettes(config.licenseType);
+  const vignettes: ClinicalVignette[] = [];
+  for (let i = 0; i < config.itemCount; i++) {
+    const base = seed[i % seed.length];
+    vignettes.push({
+      ...base,
+      id: generateId(),
+    });
+  }
+  return vignettes;
+}
+
 // ─── Main Generation Entry Point ────────────────────────────────────────
 
-export async function generateStudyMaterial(config: GeneratorConfig): Promise<GeneratedContent> {
+export interface GenerationResult {
+  content: GeneratedContent;
+  auditEntryId: string | null;
+}
+
+export async function generateStudyMaterial(
+  config: GeneratorConfig,
+  userId?: string
+): Promise<GenerationResult> {
+  const startTime = Date.now();
+
+  // Fetch relevant KB entries for prompt injection
+  let kbContext = '';
+  let kbEntryIds: string[] = [];
+  try {
+    const kbEntries = await getRelevantKBEntries({
+      licenseType: config.licenseType,
+      topic: config.topic,
+    });
+    if (kbEntries.length > 0) {
+      kbContext = formatKBForPrompt(kbEntries);
+      kbEntryIds = kbEntries.map((e) => e.id);
+    }
+  } catch {
+    // KB retrieval is non-critical; continue without it
+  }
+
+  const systemPrompt = buildSystemPrompt(config, kbContext);
+
+  let content: GeneratedContent;
   switch (config.studyFormat) {
     case 'practice_questions':
-      return { type: 'practice_questions', data: await generatePracticeQuestions(config) };
+      content = { type: 'practice_questions', data: await generatePracticeQuestions(config) };
+      break;
     case 'scenario_questions':
-      return { type: 'scenario_questions', data: await generatePracticeQuestions({ ...config, customPrompt: 'scenario-based' }) };
+      content = { type: 'scenario_questions', data: await generatePracticeQuestions({ ...config, customPrompt: 'scenario-based' }) };
+      break;
+    case 'clinical_vignette':
+      content = { type: 'clinical_vignette', data: await generateClinicalVignettes(config) };
+      break;
     case 'flashcards':
-      return { type: 'flashcards', data: await generateFlashcards(config) };
+      content = { type: 'flashcards', data: await generateFlashcards(config) };
+      break;
     case 'study_guide':
-      return { type: 'study_guide', data: await generateStudyGuide(config) };
+      content = { type: 'study_guide', data: await generateStudyGuide(config) };
+      break;
     case 'quick_reference':
-      return { type: 'quick_reference', data: await generateQuickReference(config) };
+      content = { type: 'quick_reference', data: await generateQuickReference(config) };
+      break;
     case 'mini_quiz':
-      return { type: 'mini_quiz', data: await generatePracticeQuestions({ ...config, itemCount: Math.min(config.itemCount, 10) }) };
+      content = { type: 'mini_quiz', data: await generatePracticeQuestions({ ...config, itemCount: Math.min(config.itemCount, 10) }) };
+      break;
     case 'mock_exam':
-      return { type: 'mock_exam', data: await generatePracticeQuestions({ ...config, itemCount: 25 }) };
+      content = { type: 'mock_exam', data: await generatePracticeQuestions({ ...config, itemCount: 25 }) };
+      break;
     case 'law_ethics_spotter':
-      return { type: 'law_ethics_spotter', data: await generatePracticeQuestions({ ...config, customPrompt: 'law-ethics-spotter' }) };
+      content = { type: 'law_ethics_spotter', data: await generatePracticeQuestions({ ...config, customPrompt: 'law-ethics-spotter' }) };
+      break;
     case 'rationale_review':
-      return { type: 'rationale_review', data: await generatePracticeQuestions(config) };
+      content = { type: 'rationale_review', data: await generatePracticeQuestions(config) };
+      break;
     case 'study_plan':
-      return { type: 'study_plan', data: await generateStudyPlan(config) };
+      content = { type: 'study_plan', data: await generateStudyPlan(config) };
+      break;
     default:
-      return { type: 'practice_questions', data: await generatePracticeQuestions(config) };
+      content = { type: 'practice_questions', data: await generatePracticeQuestions(config) };
   }
+
+  const generationTimeMs = Date.now() - startTime;
+
+  // Log to audit table if user is authenticated
+  let auditEntryId: string | null = null;
+  if (userId) {
+    try {
+      auditEntryId = await logGeneration({
+        userId,
+        systemPrompt,
+        promptText: `Format: ${config.studyFormat}, Topic: ${config.topic}, Difficulty: ${config.difficulty}, Items: ${config.itemCount}`,
+        outputText: JSON.stringify(content.data).slice(0, 10000), // Cap at 10k chars
+        licenseType: config.licenseType,
+        studyFormat: config.studyFormat,
+        topic: config.topic,
+        difficulty: config.difficulty,
+        modelUsed: 'mock-generator',
+        generationTimeMs,
+        kbEntriesUsed: kbEntryIds,
+      });
+    } catch {
+      // Audit logging is non-critical; continue
+    }
+  }
+
+  return { content, auditEntryId };
 }
 
 // ─── Weak Area Assessment Generator ─────────────────────────────────────

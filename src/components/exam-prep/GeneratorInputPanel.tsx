@@ -152,14 +152,14 @@ export default function GeneratorInputPanel() {
       {studyFormat !== 'study_guide' && studyFormat !== 'study_plan' && studyFormat !== 'quick_reference' && (
         <div>
           <Label className="text-sm font-medium text-slate-700 mb-3 flex justify-between">
-            <span>Number of Items</span>
+            <span>{studyFormat === 'clinical_vignette' ? 'Number of Vignettes' : 'Number of Items'}</span>
             <span className="text-blue-600 font-semibold">{itemCount}</span>
           </Label>
           <Slider
             value={[itemCount]}
             onValueChange={(v) => setItemCount(v[0])}
             min={1}
-            max={studyFormat === 'mock_exam' ? 50 : 20}
+            max={studyFormat === 'clinical_vignette' ? 5 : studyFormat === 'mock_exam' ? 50 : 20}
             step={1}
             className="mt-2"
           />

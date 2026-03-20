@@ -9,6 +9,7 @@ import type {
   Flashcard,
   StudyGuide,
   StudyPlan,
+  ClinicalVignette,
 } from '@/types/exam-prep';
 
 // ─── Topic Categories by Exam ──────────────────────────────────────────
@@ -227,6 +228,7 @@ export const EXAM_DATA: Record<LicenseType, ExamInfo> = {
 export const STUDY_FORMAT_OPTIONS: { id: StudyFormat; label: string; description: string; icon: string }[] = [
   { id: 'practice_questions', label: 'Practice Questions', description: 'Multiple-choice questions with rationales', icon: 'HelpCircle' },
   { id: 'scenario_questions', label: 'Scenario-Based Questions', description: 'Clinical vignettes with analysis', icon: 'FileText' },
+  { id: 'clinical_vignette', label: 'Clinical Vignettes (Exam-Style)', description: 'Multi-question case studies testing multiple competencies', icon: 'ClipboardList' },
   { id: 'flashcards', label: 'Flashcards', description: 'Quick-review front/back cards', icon: 'Layers' },
   { id: 'study_guide', label: 'Study Guide', description: 'Comprehensive topic overview', icon: 'BookOpen' },
   { id: 'quick_reference', label: 'Quick Reference Sheet', description: 'At-a-glance key facts', icon: 'ClipboardList' },
@@ -534,4 +536,155 @@ export function getSeedStudyPlan(license: LicenseType, weakAreas: string[]): Stu
     ],
     weakAreas: topics,
   };
+}
+
+export function getSeedVignettes(license: LicenseType): ClinicalVignette[] {
+  return [
+    {
+      id: 'vignette-seed-1',
+      clientPresentation: 'Maria, a 34-year-old Latina woman, presents to your outpatient office appearing tearful and fatigued. She speaks softly and avoids eye contact. She reports she has not been sleeping well for the past two months and has lost interest in activities she previously enjoyed, including spending time with her two children, ages 6 and 9.',
+      demographics: '34-year-old Latina female, married, two children',
+      presentingProblem: 'Persistent sadness, insomnia, anhedonia, social withdrawal over 2 months',
+      relevantHistory: 'Maria recently experienced the death of her mother, who was her primary support system. She has no prior mental health treatment. Her husband works long hours and she reports feeling isolated. She denies substance use. No prior suicide attempts but reports passive suicidal ideation ("sometimes I think my family would be better off without me").',
+      questions: [
+        {
+          questionText: 'What is your most important immediate clinical priority with this client?',
+          competencyArea: 'Risk Assessment',
+          choices: [
+            { label: 'A', text: 'Explore the grief process and cultural context of her loss' },
+            { label: 'B', text: 'Conduct a thorough suicide risk assessment given her passive suicidal ideation' },
+            { label: 'C', text: 'Administer the PHQ-9 to establish a baseline depression score' },
+            { label: 'D', text: 'Develop a treatment plan focusing on behavioral activation' },
+          ],
+          correctAnswer: 'B',
+          rationale: 'Passive suicidal ideation requires immediate risk assessment to determine the level of danger. While grief exploration, standardized measures, and treatment planning are all appropriate, safety assessment must come first.',
+          incorrectRationales: [
+            { label: 'A', explanation: 'Grief exploration is important but secondary to assessing safety when suicidal ideation is present.' },
+            { label: 'C', explanation: 'Standardized assessments are useful for treatment planning but do not replace a direct suicide risk assessment.' },
+            { label: 'D', explanation: 'Treatment planning should occur after the safety assessment is complete and risk level is determined.' },
+          ],
+        },
+        {
+          questionText: 'Which cultural consideration is MOST important in your initial work with Maria?',
+          competencyArea: 'Cultural Competence',
+          choices: [
+            { label: 'A', text: 'Assume her Latina identity means family is her primary concern' },
+            { label: 'B', text: 'Explore Maria\'s own understanding of her distress and what help-seeking means in her cultural context' },
+            { label: 'C', text: 'Immediately offer to include family members in treatment' },
+            { label: 'D', text: 'Use a Spanish-language version of all intake forms' },
+          ],
+          correctAnswer: 'B',
+          rationale: 'Cultural humility involves exploring the client\'s own perspective rather than applying stereotypes. Understanding Maria\'s explanatory model of her distress and her cultural attitudes toward mental health treatment is foundational.',
+          incorrectRationales: [
+            { label: 'A', explanation: 'Making assumptions based on ethnic identity is stereotyping, not cultural competence.' },
+            { label: 'C', explanation: 'Family involvement may be appropriate but should be discussed with Maria first based on her preferences.' },
+            { label: 'D', explanation: 'Language accommodation may be needed, but her language preference should be assessed, not assumed.' },
+          ],
+        },
+        {
+          questionText: 'If Maria\'s suicidal ideation escalates to include a plan during session, what is your legal and ethical obligation under California law?',
+          competencyArea: 'Ethics & Legal',
+          choices: [
+            { label: 'A', text: 'Document the disclosure and monitor at the next session' },
+            { label: 'B', text: 'Contact her husband to inform him of her suicidal plan' },
+            { label: 'C', text: 'Develop a safety plan with Maria and determine if a higher level of care is needed, breaking confidentiality only as necessary to protect her life' },
+            { label: 'D', text: 'Immediately call 911 regardless of Maria\'s wishes' },
+          ],
+          correctAnswer: 'C',
+          rationale: 'When suicidal ideation escalates to include a plan, the clinician must balance the duty to protect with the least restrictive intervention. Collaborative safety planning is the standard of care, with confidentiality breaches limited to what is necessary to prevent harm.',
+          incorrectRationales: [
+            { label: 'A', explanation: 'Waiting until the next session when a client has a suicidal plan is clinically and legally negligent.' },
+            { label: 'B', explanation: 'Notifying family may be part of a safety plan, but it requires clinical judgment and is not automatically required.' },
+            { label: 'D', explanation: 'Calling 911 may be appropriate in some cases but is not automatically the first step. Clinical assessment of the plan\'s lethality and imminence guides the response.' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'vignette-seed-2',
+      clientPresentation: 'James, a 17-year-old African American male, is brought to your office by his mother. He sits with arms crossed, minimal verbal responses, and appears irritable. His mother reports he was suspended from school for fighting and his grades have dropped significantly over the past semester.',
+      demographics: '17-year-old African American male, high school junior, lives with mother',
+      presentingProblem: 'School behavioral problems, declining academics, irritability, fighting',
+      relevantHistory: 'James\'s father was incarcerated 6 months ago. He was previously an honor student and athlete. His mother works two jobs. James has started spending time with a new peer group. He denies substance use but his mother suspects marijuana. No prior mental health treatment.',
+      questions: [
+        {
+          questionText: 'What diagnostic considerations should you prioritize during your initial assessment?',
+          competencyArea: 'Diagnosis',
+          choices: [
+            { label: 'A', text: 'Conduct Disorder given the fighting and behavioral changes' },
+            { label: 'B', text: 'Adjustment Disorder and possible depression, given the recent family disruption and behavior change' },
+            { label: 'C', text: 'Oppositional Defiant Disorder based on his irritability and resistance in session' },
+            { label: 'D', text: 'ADHD since his grades have dropped' },
+          ],
+          correctAnswer: 'B',
+          rationale: 'James\'s behavioral changes are temporally linked to his father\'s incarceration — a significant psychosocial stressor. An Adjustment Disorder or depressive episode better explains the marked shift from prior high functioning. Irritability is a key depression symptom in adolescents.',
+          incorrectRationales: [
+            { label: 'A', explanation: 'Conduct Disorder requires a persistent pattern, and these behaviors are recent with a clear precipitant. This risks pathologizing grief.' },
+            { label: 'C', explanation: 'ODD requires at least 6 months of symptoms and James\'s behavior appears reactive to trauma, not characterological.' },
+            { label: 'D', explanation: 'ADHD does not typically present as a sudden change in academic performance linked to a life event.' },
+          ],
+        },
+        {
+          questionText: 'James refuses to speak during session. What is the MOST clinically appropriate approach?',
+          competencyArea: 'Treatment Planning',
+          choices: [
+            { label: 'A', text: 'Require verbal participation as a condition of treatment' },
+            { label: 'B', text: 'Meet with his mother alone to gather information since James is uncooperative' },
+            { label: 'C', text: 'Acknowledge his resistance non-judgmentally and use engagement strategies appropriate for adolescents' },
+            { label: 'D', text: 'Refer him to a male therapist who might build better rapport' },
+          ],
+          correctAnswer: 'C',
+          rationale: 'Adolescent resistance is normative, especially when mandated to attend. Non-judgmental acknowledgment, motivational approaches, and meeting the client where they are is the evidence-based approach to building therapeutic alliance with resistant adolescents.',
+          incorrectRationales: [
+            { label: 'A', explanation: 'Demanding participation creates a power struggle and mirrors the authoritarian dynamics that may be contributing to his distress.' },
+            { label: 'B', explanation: 'While collateral information is useful, meeting alone with the parent before establishing trust with the adolescent can damage the therapeutic relationship.' },
+            { label: 'D', explanation: 'Premature referral based on assumptions about rapport avoids the clinician\'s responsibility to develop culturally responsive engagement skills.' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'vignette-seed-3',
+      clientPresentation: 'Dr. Chen, a 52-year-old physician, presents voluntarily seeking help for "burnout." She appears well-groomed but displays flat affect. She reports working 70-hour weeks, frequent headaches, and has been prescribing herself benzodiazepines for sleep for the past 4 months.',
+      demographics: '52-year-old Asian American female, physician, divorced, one adult child',
+      presentingProblem: 'Burnout symptoms, self-prescribing benzodiazepines, sleep disturbance',
+      relevantHistory: 'Divorced 18 months ago. Reports her medical practice is her "identity." Has been increasingly isolated from friends. No prior psychiatric history. Drinks 2-3 glasses of wine nightly "to unwind." Reports no suicidal ideation but states "I don\'t see the point of anything anymore."',
+      questions: [
+        {
+          questionText: 'Which clinical issue requires the MOST immediate attention?',
+          competencyArea: 'Risk Assessment',
+          choices: [
+            { label: 'A', text: 'The burnout symptoms and work-life balance' },
+            { label: 'B', text: 'The self-prescribing behavior and concurrent alcohol use, which together suggest substance misuse' },
+            { label: 'C', text: 'The divorce adjustment and identity concerns' },
+            { label: 'D', text: 'The flat affect and possible depressive episode' },
+          ],
+          correctAnswer: 'B',
+          rationale: 'Self-prescribing benzodiazepines is both a professional ethics issue and a clinical safety concern, especially combined with nightly alcohol use. Benzodiazepine-alcohol combination carries serious risks including respiratory depression. This requires immediate clinical attention.',
+          incorrectRationales: [
+            { label: 'A', explanation: 'Burnout is important contextually but is less immediately dangerous than substance misuse.' },
+            { label: 'C', explanation: 'Divorce adjustment is relevant but not the most urgent clinical concern given the substance picture.' },
+            { label: 'D', explanation: 'Depression assessment is important but the substance use must be addressed first as it affects both safety and diagnostic clarity.' },
+          ],
+        },
+        {
+          questionText: 'Regarding the self-prescribing, what are your ethical obligations?',
+          competencyArea: 'Ethics & Legal',
+          choices: [
+            { label: 'A', text: 'This is outside your scope — she is a physician and can manage her own medications' },
+            { label: 'B', text: 'Report her immediately to the Medical Board of California' },
+            { label: 'C', text: 'Address the clinical and ethical dimensions therapeutically while considering whether a report to the Medical Board is warranted based on patient safety concerns' },
+            { label: 'D', text: 'Focus only on the therapeutic relationship and avoid the prescribing issue' },
+          ],
+          correctAnswer: 'C',
+          rationale: 'Self-prescribing controlled substances raises both clinical and professional ethics concerns. The therapist should address this therapeutically and evaluate whether the physician\'s impairment may pose a risk to her patients, which could trigger a duty to report.',
+          incorrectRationales: [
+            { label: 'A', explanation: 'Self-prescribing controlled substances is considered impaired practice, not standard medical self-care.' },
+            { label: 'B', explanation: 'Immediate reporting without clinical assessment is premature. The clinician should first evaluate the situation clinically.' },
+            { label: 'D', explanation: 'Ignoring a significant safety and ethics issue to preserve rapport is clinically inappropriate.' },
+          ],
+        },
+      ],
+    },
+  ];
 }
