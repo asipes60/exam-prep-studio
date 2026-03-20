@@ -12,5 +12,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+    // Disable navigator.locks which deadlocks in some environments with supabase-js v2.39+
+    lock: (_name: string, _acquireTimeout: number, fn: () => Promise<any>) => fn(),
   }
 });
