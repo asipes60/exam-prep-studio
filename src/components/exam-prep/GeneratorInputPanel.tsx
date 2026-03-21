@@ -18,7 +18,7 @@ import { getExamFormat } from '@/types/exam-prep';
 import { Sparkles, Loader2 } from 'lucide-react';
 
 export default function GeneratorInputPanel() {
-  const { selectedLicense, setSelectedLicense, generateContent, isGenerating, pendingConfig, setPendingConfig } = useExamPrep();
+  const { selectedLicense, setSelectedLicense, generateContent, isGenerating, pendingConfig, setPendingConfig, weakAreas } = useExamPrep();
 
   const [studyFormat, setStudyFormat] = useState<StudyFormat>('practice_questions');
   const [topic, setTopic] = useState('');
@@ -132,6 +132,25 @@ export default function GeneratorInputPanel() {
               <SelectValue placeholder="Choose a topic..." />
             </SelectTrigger>
             <SelectContent>
+              {/* Weak area suggestions at top */}
+              {weakAreas.length > 0 && examInfo && (() => {
+                const weakTopics = examInfo.categories
+                  .filter((cat) => weakAreas.some((wa) => wa === cat.name))
+                  .flatMap((cat) => cat.topics);
+                if (weakTopics.length === 0) return null;
+                return (
+                  <div>
+                    <div className="px-2 py-1.5 text-xs font-semibold text-red-500 uppercase tracking-wider">
+                      Suggested: Your Weak Areas
+                    </div>
+                    {weakTopics.slice(0, 5).map((t) => (
+                      <SelectItem key={`weak-${t}`} value={t}>
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </div>
+                );
+              })()}
               {examInfo?.categories.map((cat) => (
                 <div key={cat.id}>
                   <div className="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">

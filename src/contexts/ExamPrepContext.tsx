@@ -13,6 +13,7 @@ import * as storage from '@/lib/exam-prep-storage';
 import { generateStudyMaterial } from '@/lib/exam-prep-ai';
 import { useAuth } from '@/hooks/use-auth';
 import { toast } from 'sonner';
+import type { DomainScoreRow } from '@/lib/exam-prep-storage';
 
 interface ExamPrepState {
   // Generator
@@ -39,6 +40,9 @@ interface ExamPrepState {
   deleteFolder: (id: string) => void;
   refreshSavedMaterials: () => void;
 
+  // Weak areas (derived from domain scores)
+  weakAreas: string[];
+
   // Quiz
   activeQuiz: QuizSession | null;
   setActiveQuiz: (quiz: QuizSession | null) => void;
@@ -60,6 +64,21 @@ export function ExamPrepProvider({ children }: { children: React.ReactNode }) {
   const [activeQuiz, setActiveQuiz] = useState<QuizSession | null>(null);
   const [studyMode, setStudyMode] = useState<StudyMode>('study');
   const [pendingConfig, setPendingConfig] = useState<GeneratorConfig | null>(null);
+  const [weakAreas, setWeakAreas] = useState<string[]>([]);
+
+  // Load weak areas from domain scores when license or user changes
+  useEffect(() => {
+    if (!user || !selectedLicense) {
+      setWeakAreas([]);
+      return;
+    }
+    storage.getDomainScores(user.id, selectedLicense).then((scores) => {
+      const weak = scores
+        .filter((s) => s.totalQuestions > 0 && (s.correctAnswers / s.totalQuestions) < 0.6)
+        .map((s) => s.domainName);
+      setWeakAreas(weak);
+    }).catch(() => {});
+  }, [user, selectedLicense]);
 
   // Load saved materials and folders from Supabase when user changes
   useEffect(() => {
@@ -170,6 +189,7 @@ export function ExamPrepProvider({ children }: { children: React.ReactNode }) {
         latestAuditEntryId,
         pendingConfig,
         setPendingConfig,
+        weakAreas,
         savedMaterials,
         folders,
         saveMaterial: handleSaveMaterial,

@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useExamPrep } from '@/contexts/ExamPrepContext';
 import { useAuth } from '@/hooks/use-auth';
+import DashboardSummaryWidget from '@/components/exam-prep/DashboardSummaryWidget';
 import { EXAM_DATA, STUDY_FORMAT_OPTIONS } from '@/data/exam-prep-data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -31,8 +32,8 @@ const iconMap: Record<string, React.ElementType> = {
 const featureIcons = [Sparkles, Brain, FileText, Layers, Clock, Award];
 
 export default function ExamPrepLanding() {
-  const { setSelectedLicense } = useExamPrep();
-  const { isAuthenticated } = useAuth();
+  const { setSelectedLicense, selectedLicense } = useExamPrep();
+  const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
 
   function handleExamSelect(license: LicenseType) {
@@ -89,6 +90,15 @@ export default function ExamPrepLanding() {
           </div>
         </div>
       </section>
+
+      {/* Dashboard Summary (logged-in users with quiz data) */}
+      {isAuthenticated && (
+        <section className="py-6">
+          <div className="container-custom max-w-3xl">
+            <DashboardSummaryWidget licenseType={selectedLicense ?? (user?.preferredLicense as LicenseType | null) ?? null} />
+          </div>
+        </section>
+      )}
 
       {/* Exam Selection */}
       <section id="exam-select" className="py-16 md:py-20">
