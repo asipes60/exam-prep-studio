@@ -21,10 +21,10 @@ export default function ExamPrepNav() {
 
   const navLinks = [
     { to: '/', label: 'Home', icon: BookOpen },
+    ...(isAuthenticated ? [{ to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }] : []),
     { to: '/generator', label: 'Generator', icon: FileText },
     { to: '/quiz', label: 'Quiz', icon: ClipboardCheck },
     { to: '/assessment', label: 'Weak Areas', icon: Brain },
-    { to: '/saved', label: 'My Materials', icon: LayoutDashboard },
   ];
 
   const isActive = (path: string) => location.pathname === path;

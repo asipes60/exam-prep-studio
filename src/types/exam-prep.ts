@@ -197,6 +197,28 @@ export interface UserProfile {
   isGuest: boolean;
 }
 
+// ─── Dashboard Types ────────────────────────────────────────────────────
+
+export interface DomainScore {
+  domainId: string;
+  domainName: string;
+  totalQuestions: number;
+  correctAnswers: number;
+  percentage: number;
+  isWeak: boolean;   // < 60%
+  isStrong: boolean; // >= 80%
+}
+
+export interface DashboardData {
+  domainScores: DomainScore[];
+  readinessScore: number;
+  totalQuizzes: number;
+  totalQuestions: number;
+  weakAreas: string[];
+  strongAreas: string[];
+  recentQuizzes: { id: string; score: number; total: number; date: string; licenseType: LicenseType }[];
+}
+
 // Admin-ready interfaces for future expansion
 export interface SubscriptionPlan {
   id: string;

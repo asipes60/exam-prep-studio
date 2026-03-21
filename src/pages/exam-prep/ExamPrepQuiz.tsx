@@ -4,7 +4,8 @@ import { useExamPrep } from '@/contexts/ExamPrepContext';
 import { useAuth } from '@/hooks/use-auth';
 import { EXAM_DATA } from '@/data/exam-prep-data';
 import { generateQuizBatches } from '@/lib/exam-prep-ai';
-import { saveQuizSession, saveQuizSessionAsync } from '@/lib/exam-prep-storage';
+import { saveQuizSession, saveQuizSessionAsync, saveDomainScores } from '@/lib/exam-prep-storage';
+import { computeDomainScoresFromQuiz } from '@/lib/domain-mapping';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -297,9 +298,13 @@ export default function ExamPrepQuiz() {
     };
     saveQuizSession(session);
 
-    // Save to Supabase if authenticated
+    // Save to Supabase and update domain scores if authenticated
     if (user?.id) {
       saveQuizSessionAsync(user.id, session).catch(() => {});
+      const domainResults = computeDomainScoresFromQuiz(session);
+      if (domainResults.length > 0) {
+        saveDomainScores(user.id, license!, domainResults).catch(() => {});
+      }
     }
 
     setState('review');
