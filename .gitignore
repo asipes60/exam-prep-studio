@@ -26,3 +26,8 @@ supabase/.temp/
 # Logs
 *.log
 npm-debug.log*
+
+.vercel
+
+# Claude Code local config
+.claude/

@@ -17,10 +17,17 @@ export async function getRelevantKBEntries(config: {
   topic: string;
 }): Promise<KBEntry[]> {
   // Fetch entries that match the license type (or are universal — empty array)
-  const { data, error } = await supabase
+  // Race against a 5-second timeout to prevent infinite spinner
+  const queryPromise = supabase
     .from('admin_knowledge_base')
     .select('id, title, category, content, topics, license_types')
     .order('updated_at', { ascending: false });
+
+  const timeoutPromise = new Promise<{ data: null; error: { message: string } }>((resolve) =>
+    setTimeout(() => resolve({ data: null, error: { message: 'KB query timed out' } }), 5000)
+  );
+
+  const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
 
   if (error || !data || data.length === 0) return [];
 

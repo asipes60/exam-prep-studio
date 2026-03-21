@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -18,9 +18,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
-import { Plus, Pencil, Trash2, Search, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface KBEntry {
@@ -55,6 +54,101 @@ export default function AdminKnowledgeBase() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragCounterRef = useRef(0);
+
+  async function readFileAsText(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsText(file);
+    });
+  }
+
+  async function readPdfAsText(file: File): Promise<string> {
+    const pdfjsLib = await import('pdfjs-dist');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+      'pdfjs-dist/build/pdf.worker.min.mjs',
+      import.meta.url,
+    ).toString();
+
+    const buffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+    const pages: string[] = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(' ');
+      pages.push(pageText);
+    }
+    return pages.join('\n\n');
+  }
+
+  async function handleFiles(files: FileList | File[]) {
+    const fileArray = Array.from(files);
+    const supported = fileArray.filter((f) =>
+      /\.(txt|md|csv|json|tsv|pdf)$/i.test(f.name)
+    );
+
+    if (supported.length === 0) {
+      toast.error('Unsupported file type. Drop .txt, .md, .csv, .json, or .pdf files.');
+      return;
+    }
+
+    for (const file of supported) {
+      try {
+        const isPdf = /\.pdf$/i.test(file.name);
+        const content = isPdf ? await readPdfAsText(file) : await readFileAsText(file);
+        const title = file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
+        setEditingId(null);
+        setForm({
+          ...EMPTY_FORM,
+          title,
+          content: content.slice(0, 50000), // cap at 50k chars
+        });
+        setDialogOpen(true);
+        if (supported.length > 1) {
+          toast.info(`Opened "${file.name}" — save it, then drop the next file.`);
+        }
+        break; // open one at a time so user can review/tag each
+      } catch {
+        toast.error(`Failed to read ${file.name}`);
+      }
+    }
+  }
+
+  function handleDragEnter(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (dragCounterRef.current === 1) setIsDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) setIsDragging(false);
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDragging(false);
+    if (e.dataTransfer.files.length > 0) {
+      handleFiles(e.dataTransfer.files);
+    }
+  }
 
   const loadEntries = useCallback(async () => {
     let query = supabase
@@ -152,14 +246,42 @@ export default function AdminKnowledgeBase() {
   };
 
   return (
-    <div>
+    <div
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       <div className="flex items-center justify-between mb-6">
         <h2 className="font-montserrat font-semibold text-xl text-slate-900">Knowledge Base</h2>
-        <Button onClick={openNew} className="bg-blue-600 hover:bg-blue-700">
-          <Plus className="w-4 h-4 mr-1.5" />
-          Add Entry
-        </Button>
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".txt,.md,.csv,.json,.tsv,.pdf"
+            multiple
+            className="hidden"
+            onChange={(e) => e.target.files && handleFiles(e.target.files)}
+          />
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+            <Upload className="w-4 h-4 mr-1.5" />
+            Upload File
+          </Button>
+          <Button onClick={openNew} className="bg-blue-600 hover:bg-blue-700">
+            <Plus className="w-4 h-4 mr-1.5" />
+            Add Entry
+          </Button>
+        </div>
       </div>
+
+      {/* Drop zone overlay */}
+      {isDragging && (
+        <div className="mb-4 border-2 border-dashed border-blue-400 bg-blue-50 rounded-lg p-8 text-center transition-colors">
+          <Upload className="w-8 h-8 text-blue-400 mx-auto mb-2" />
+          <p className="text-sm font-medium text-blue-600">Drop files here to add as KB entries</p>
+          <p className="text-xs text-blue-400 mt-1">.txt, .md, .csv, .json, .pdf supported</p>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex items-center gap-3 mb-4">

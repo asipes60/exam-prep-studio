@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type {
   LicenseType,
   StudyFormat,
@@ -12,6 +12,7 @@ import type {
 import * as storage from '@/lib/exam-prep-storage';
 import { generateStudyMaterial } from '@/lib/exam-prep-ai';
 import { useAuth } from '@/hooks/use-auth';
+import { toast } from 'sonner';
 
 interface ExamPrepState {
   // Generator
@@ -50,10 +51,21 @@ export function ExamPrepProvider({ children }: { children: React.ReactNode }) {
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [latestAuditEntryId, setLatestAuditEntryId] = useState<string | null>(null);
-  const [savedMaterials, setSavedMaterials] = useState<SavedMaterial[]>(() => storage.getSavedMaterials());
-  const [folders, setFolders] = useState<Folder[]>(() => storage.getFolders());
+  const [savedMaterials, setSavedMaterials] = useState<SavedMaterial[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
   const [activeQuiz, setActiveQuiz] = useState<QuizSession | null>(null);
   const [studyMode, setStudyMode] = useState<StudyMode>('study');
+
+  // Load saved materials and folders from Supabase when user changes
+  useEffect(() => {
+    if (!user) {
+      setSavedMaterials([]);
+      setFolders([]);
+      return;
+    }
+    storage.getSavedMaterialsAsync().then(setSavedMaterials).catch(() => {});
+    storage.getFoldersAsync().then(setFolders).catch(() => {});
+  }, [user]);
 
   const updateGeneratorConfig = useCallback((updates: Partial<GeneratorConfig>) => {
     setGeneratorConfig((prev) => ({ ...prev, ...updates }));
@@ -67,43 +79,77 @@ export function ExamPrepProvider({ children }: { children: React.ReactNode }) {
       const result = await generateStudyMaterial(config, user?.id);
       setGeneratedContent(result.content);
       setLatestAuditEntryId(result.auditEntryId);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Generation failed:', err);
+      toast.error(err.message || 'Generation failed. Please try again.');
     } finally {
       setIsGenerating(false);
     }
   }, [user?.id]);
 
   const handleSaveMaterial = useCallback((material: SavedMaterial) => {
-    storage.saveMaterial(material);
-    setSavedMaterials(storage.getSavedMaterials());
+    // Optimistic update
+    setSavedMaterials((prev) => {
+      const idx = prev.findIndex((m) => m.id === material.id);
+      if (idx >= 0) {
+        const updated = [...prev];
+        updated[idx] = { ...material, updatedAt: new Date().toISOString() };
+        return updated;
+      }
+      return [material, ...prev];
+    });
+    // Persist to Supabase
+    storage.saveMaterialAsync(material).catch(() => {
+      toast.error('Failed to save material');
+    });
   }, []);
 
   const handleDeleteMaterial = useCallback((id: string) => {
-    storage.deleteMaterial(id);
-    setSavedMaterials(storage.getSavedMaterials());
+    setSavedMaterials((prev) => prev.filter((m) => m.id !== id));
+    storage.deleteMaterialAsync(id).catch(() => {
+      toast.error('Failed to delete material');
+    });
   }, []);
 
   const handleToggleFavorite = useCallback((id: string) => {
-    storage.toggleFavorite(id);
-    setSavedMaterials(storage.getSavedMaterials());
+    setSavedMaterials((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, isFavorite: !m.isFavorite } : m))
+    );
+    storage.toggleFavoriteAsync(id).catch(() => {
+      toast.error('Failed to update favorite');
+    });
   }, []);
 
   const handleCreateFolder = useCallback((name: string) => {
-    const folder = storage.createFolder(name);
-    setFolders(storage.getFolders());
-    return folder;
+    const tempFolder: Folder = {
+      id: `folder-${Date.now()}`,
+      name,
+      createdAt: new Date().toISOString(),
+      materialCount: 0,
+    };
+    setFolders((prev) => [tempFolder, ...prev]);
+    // Create in Supabase (will use real ID on next refresh)
+    storage.createFolderAsync(name).then((folder) => {
+      setFolders((prev) => prev.map((f) => (f.id === tempFolder.id ? folder : f)));
+    }).catch(() => {
+      toast.error('Failed to create folder');
+    });
+    return tempFolder;
   }, []);
 
   const handleDeleteFolder = useCallback((id: string) => {
-    storage.deleteFolder(id);
-    setFolders(storage.getFolders());
-    setSavedMaterials(storage.getSavedMaterials());
+    setFolders((prev) => prev.filter((f) => f.id !== id));
+    setSavedMaterials((prev) =>
+      prev.map((m) => (m.folderId === id ? { ...m, folderId: undefined } : m))
+    );
+    storage.deleteFolderAsync(id).catch(() => {
+      toast.error('Failed to delete folder');
+    });
   }, []);
 
   const refreshSavedMaterials = useCallback(() => {
-    setSavedMaterials(storage.getSavedMaterials());
-    setFolders(storage.getFolders());
+    storage.getSavedMaterialsAsync().then(setSavedMaterials).catch(() => {});
+    storage.getFoldersAsync().then(setFolders).catch(() => {});
   }, []);
 
   return (
