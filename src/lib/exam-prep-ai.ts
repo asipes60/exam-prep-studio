@@ -48,11 +48,12 @@ DISCLAIMER TO INCLUDE:
 This content is for educational study purposes only and does not replace official exam prep materials, legal consultation, or clinical supervision.`;
 
   if (config.studyFormat === 'clinical_vignette') {
+    const qPerVignette = config.questionsPerVignette ?? 5;
     prompt += `
 
 CLINICAL VIGNETTE INSTRUCTIONS:
 - Create a realistic, paragraph-length client presentation with demographics, presenting problem, and relevant history.
-- Follow each vignette with 4-6 questions testing different competency areas (diagnosis, treatment planning, ethics, risk assessment, cultural competence).
+- Follow each vignette with exactly ${qPerVignette} questions testing different competency areas (diagnosis, treatment planning, ethics, risk assessment, cultural competence).
 - Each question should have 4 answer choices with detailed rationales for correct and incorrect answers.
 - Present nuanced cases with competing clinical priorities, reflecting actual exam complexity.
 - Ensure vignettes reflect diverse client populations and clinical settings.`;
@@ -82,16 +83,18 @@ Generate exactly ${itemCount} multiple-choice questions. Each question must have
 Include detailed rationale for the correct answer and explanations for why each incorrect answer is wrong.
 Assign each question a unique id starting with "gen-".`;
 
-    case 'clinical_vignette':
+    case 'clinical_vignette': {
+      const qPerVignette = config.questionsPerVignette ?? 5;
       return `${base}
 Generate exactly ${itemCount} clinical vignettes. Each vignette must include:
 - A realistic paragraph-length client presentation
 - Client demographics
 - Presenting problem
 - Relevant history
-- 4-6 follow-up questions testing different competency areas (diagnosis, treatment planning, ethics, risk assessment, cultural competence)
+- Exactly ${qPerVignette} follow-up questions testing different competency areas (diagnosis, treatment planning, ethics, risk assessment, cultural competence)
 Each question should have 4 choices with detailed rationales.
 Assign each vignette and question a unique id starting with "gen-".`;
+    }
 
     case 'flashcards':
       return `${base}
@@ -323,6 +326,76 @@ export async function generateStudyMaterial(
   }
 
   return { content, auditEntryId, model: modelUsed };
+}
+
+// ─── Quiz Batch Generator ───────────────────────────────────────────────
+
+const BATCH_SIZE_MCQ = 25;
+
+export async function generateQuizBatches(
+  config: GeneratorConfig,
+  onProgress?: (batch: number, total: number) => void,
+  userId?: string,
+): Promise<GenerationResult> {
+  const totalItems = config.itemCount;
+
+  // For vignettes: each batch = 1 vignette, questionsPerVignette determines Qs per vignette
+  if (config.studyFormat === 'clinical_vignette') {
+    const vignetteCount = totalItems; // itemCount = number of vignettes
+    const allVignettes: ClinicalVignette[] = [];
+    let lastResult: GenerationResult | null = null;
+
+    for (let i = 0; i < vignetteCount; i++) {
+      onProgress?.(i + 1, vignetteCount);
+      const batchConfig: GeneratorConfig = {
+        ...config,
+        itemCount: 1,
+      };
+      const result = await generateStudyMaterial(batchConfig, userId);
+      lastResult = result;
+      if (result.content.type === 'clinical_vignette') {
+        allVignettes.push(...result.content.data);
+      }
+    }
+
+    return {
+      content: { type: 'clinical_vignette', data: allVignettes },
+      auditEntryId: lastResult?.auditEntryId ?? null,
+      model: lastResult?.model ?? 'unknown',
+    };
+  }
+
+  // For MCQs: batch in groups of BATCH_SIZE_MCQ
+  if (totalItems <= BATCH_SIZE_MCQ) {
+    onProgress?.(1, 1);
+    return generateStudyMaterial(config, userId);
+  }
+
+  const batchCount = Math.ceil(totalItems / BATCH_SIZE_MCQ);
+  const allQuestions: PracticeQuestion[] = [];
+  let lastResult: GenerationResult | null = null;
+
+  for (let i = 0; i < batchCount; i++) {
+    const remaining = totalItems - i * BATCH_SIZE_MCQ;
+    const batchSize = Math.min(BATCH_SIZE_MCQ, remaining);
+    onProgress?.(i + 1, batchCount);
+
+    const batchConfig: GeneratorConfig = {
+      ...config,
+      itemCount: batchSize,
+    };
+    const result = await generateStudyMaterial(batchConfig, userId);
+    lastResult = result;
+    if (result.content.type === 'practice_questions') {
+      allQuestions.push(...result.content.data);
+    }
+  }
+
+  return {
+    content: { type: 'practice_questions', data: allQuestions },
+    auditEntryId: lastResult?.auditEntryId ?? null,
+    model: lastResult?.model ?? 'unknown',
+  };
 }
 
 // ─── Weak Area Assessment Generator ─────────────────────────────────────

@@ -41,6 +41,7 @@ export interface GeneratorConfig {
   californiaEmphasis: boolean;
   isBeginnerReview: boolean;
   customPrompt?: string;
+  questionsPerVignette?: number;
 }
 
 export interface PracticeQuestion {
@@ -131,11 +132,18 @@ export interface QuizSession {
   id: string;
   licenseType: LicenseType;
   mode: StudyMode;
+  format: 'practice_questions' | 'clinical_vignette';
   questions: PracticeQuestion[];
+  vignettes?: ClinicalVignette[];
   results: QuizResult[];
   startedAt: string;
   completedAt?: string;
   score?: number;
+}
+
+/** Maps license type to the real exam format */
+export function getExamFormat(license: LicenseType): 'practice_questions' | 'clinical_vignette' {
+  return license === 'LPCC' ? 'clinical_vignette' : 'practice_questions';
 }
 
 export type GeneratedContent =

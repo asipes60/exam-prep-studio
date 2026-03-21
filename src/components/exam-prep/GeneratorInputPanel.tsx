@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useExamPrep } from '@/contexts/ExamPrepContext';
 import { EXAM_DATA, STUDY_FORMAT_OPTIONS } from '@/data/exam-prep-data';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { GeneratorConfig, LicenseType, StudyFormat } from '@/types/exam-prep';
+import { getExamFormat } from '@/types/exam-prep';
 import { Sparkles, Loader2 } from 'lucide-react';
 
 export default function GeneratorInputPanel() {
@@ -25,6 +26,14 @@ export default function GeneratorInputPanel() {
   const [itemCount, setItemCount] = useState(5);
   const [includeRationales, setIncludeRationales] = useState(true);
   const [californiaEmphasis, setCaliforniaEmphasis] = useState(true);
+
+  // Auto-select primary format when license changes
+  useEffect(() => {
+    if (selectedLicense) {
+      const defaultFormat = getExamFormat(selectedLicense);
+      setStudyFormat(defaultFormat);
+    }
+  }, [selectedLicense]);
 
   const examInfo = selectedLicense ? EXAM_DATA[selectedLicense] : null;
 
