@@ -32,7 +32,7 @@ const ratingLabels: Record<number, string> = {
 };
 
 export default function ExamPrepAssessment() {
-  const { setSelectedLicense, setPendingConfig } = useExamPrep();
+  const { setSelectedLicense, setPendingConfig, loadActivePlan } = useExamPrep();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -109,7 +109,9 @@ export default function ExamPrepAssessment() {
 
       // Save to Supabase if authenticated, otherwise localStorage
       if (user?.id) {
-        saveAssessmentAsync(user.id, assessmentResult, license).catch(() => {});
+        saveAssessmentAsync(user.id, assessmentResult, license)
+          .then(() => loadActivePlan())
+          .catch(() => {});
       } else {
         saveAssessment(assessmentResult);
       }

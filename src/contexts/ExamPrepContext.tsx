@@ -8,6 +8,7 @@ import type {
   Folder,
   QuizSession,
   StudyMode,
+  StudyPlan,
 } from '@/types/exam-prep';
 import * as storage from '@/lib/exam-prep-storage';
 import { generateStudyMaterial } from '@/lib/exam-prep-ai';
@@ -40,6 +41,11 @@ interface ExamPrepState {
   deleteFolder: (id: string) => void;
   refreshSavedMaterials: () => void;
 
+  // Study Plan
+  activePlan: { id: string; plan: StudyPlan; licenseType: LicenseType; createdAt: string; completedWeeks: number[] } | null;
+  loadActivePlan: () => Promise<void>;
+  planLoading: boolean;
+
   // Weak areas (derived from domain scores)
   weakAreas: string[];
 
@@ -65,6 +71,39 @@ export function ExamPrepProvider({ children }: { children: React.ReactNode }) {
   const [studyMode, setStudyMode] = useState<StudyMode>('study');
   const [pendingConfig, setPendingConfig] = useState<GeneratorConfig | null>(null);
   const [weakAreas, setWeakAreas] = useState<string[]>([]);
+  const [activePlan, setActivePlan] = useState<ExamPrepState['activePlan']>(null);
+  const [planLoading, setPlanLoading] = useState(false);
+
+  // Load active study plan when user or license changes
+  const loadActivePlan = useCallback(async () => {
+    if (!user) {
+      setActivePlan(null);
+      return;
+    }
+    setPlanLoading(true);
+    try {
+      const data = await storage.getLatestAssessmentAsync(user.id, selectedLicense ?? undefined);
+      if (data?.suggestedPlan) {
+        setActivePlan({
+          id: data.id,
+          plan: data.suggestedPlan,
+          licenseType: data.licenseType,
+          createdAt: data.createdAt,
+          completedWeeks: data.completedWeeks,
+        });
+      } else {
+        setActivePlan(null);
+      }
+    } catch {
+      setActivePlan(null);
+    } finally {
+      setPlanLoading(false);
+    }
+  }, [user, selectedLicense]);
+
+  useEffect(() => {
+    loadActivePlan();
+  }, [loadActivePlan]);
 
   // Load weak areas from domain scores when license or user changes
   useEffect(() => {
@@ -189,6 +228,9 @@ export function ExamPrepProvider({ children }: { children: React.ReactNode }) {
         latestAuditEntryId,
         pendingConfig,
         setPendingConfig,
+        activePlan,
+        loadActivePlan,
+        planLoading,
         weakAreas,
         savedMaterials,
         folders,

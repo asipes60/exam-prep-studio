@@ -32,7 +32,7 @@ const iconMap: Record<string, React.ElementType> = {
 const featureIcons = [Sparkles, Brain, FileText, Layers, Clock, Award];
 
 export default function ExamPrepLanding() {
-  const { setSelectedLicense, selectedLicense } = useExamPrep();
+  const { setSelectedLicense, selectedLicense, activePlan } = useExamPrep();
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
 
@@ -87,6 +87,17 @@ export default function ExamPrepLanding() {
                 </Button>
               </Link>
             </div>
+            {isAuthenticated && activePlan && (
+              <div className="mt-4">
+                <Button
+                  size="lg"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-base px-8 h-12"
+                  onClick={() => navigate('/plan')}
+                >
+                  Continue Your Study Plan <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </section>

@@ -11,6 +11,7 @@ import type {
   WeakAreaAssessmentResult,
   LicenseType,
   StudyFormat,
+  StudyPlan,
 } from '@/types/exam-prep';
 
 const STORAGE_KEYS = {
@@ -287,17 +288,22 @@ export async function saveAssessmentAsync(
   userId: string,
   result: WeakAreaAssessmentResult,
   licenseType: LicenseType,
-): Promise<void> {
-  await supabase.from('exam_prep_assessments').insert({
-    user_id: userId,
-    license_type: licenseType,
-    ratings: result.ratings as unknown as Record<string, unknown>[],
-    weak_areas: result.weakAreas,
-    strong_areas: result.strongAreas,
-    suggested_plan: result.suggestedPlan as unknown as Record<string, unknown>,
-  });
+): Promise<string | null> {
+  const { data } = await supabase
+    .from('exam_prep_assessments')
+    .insert({
+      user_id: userId,
+      license_type: licenseType,
+      ratings: result.ratings as unknown as Record<string, unknown>[],
+      weak_areas: result.weakAreas,
+      strong_areas: result.strongAreas,
+      suggested_plan: result.suggestedPlan as unknown as Record<string, unknown>,
+    })
+    .select('id')
+    .single();
   // Also save to localStorage as fallback
   saveAssessment(result);
+  return data?.id ?? null;
 }
 
 export async function getAssessmentsAsync(
@@ -323,6 +329,73 @@ export async function getAssessmentsAsync(
     strongAreas: row.strong_areas ?? [],
     suggestedPlan: row.suggested_plan as unknown as WeakAreaAssessmentResult['suggestedPlan'],
   }));
+}
+
+// ─── Active Study Plan (Supabase) ────────────────────────────────────────
+
+export interface ActivePlanData {
+  id: string;
+  licenseType: LicenseType;
+  suggestedPlan: StudyPlan | null;
+  weakAreas: string[];
+  strongAreas: string[];
+  completedWeeks: number[];
+  createdAt: string;
+}
+
+export async function getLatestAssessmentAsync(
+  userId: string,
+  licenseType?: LicenseType,
+): Promise<ActivePlanData | null> {
+  let query = supabase
+    .from('exam_prep_assessments')
+    .select('id, license_type, suggested_plan, weak_areas, strong_areas, completed_weeks, created_at')
+    .eq('user_id', userId)
+    .not('suggested_plan', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (licenseType) {
+    query = query.eq('license_type', licenseType);
+  }
+
+  const { data, error } = await query;
+  if (error || !data) return null;
+
+  return {
+    id: data.id,
+    licenseType: data.license_type as LicenseType,
+    suggestedPlan: data.suggested_plan as unknown as StudyPlan | null,
+    weakAreas: data.weak_areas ?? [],
+    strongAreas: data.strong_areas ?? [],
+    completedWeeks: (data as any).completed_weeks ?? [],
+    createdAt: data.created_at,
+  };
+}
+
+export async function toggleWeekCompleted(
+  assessmentId: string,
+  weekNumber: number,
+): Promise<number[]> {
+  // Read current completed weeks
+  const { data } = await supabase
+    .from('exam_prep_assessments')
+    .select('completed_weeks')
+    .eq('id', assessmentId)
+    .single();
+
+  const current: number[] = (data as any)?.completed_weeks ?? [];
+  const updated = current.includes(weekNumber)
+    ? current.filter((w) => w !== weekNumber)
+    : [...current, weekNumber];
+
+  await supabase
+    .from('exam_prep_assessments')
+    .update({ completed_weeks: updated })
+    .eq('id', assessmentId);
+
+  return updated;
 }
 
 // ─── Domain Scores (Supabase) ───────────────────────────────────────────

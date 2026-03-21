@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { LicenseType } from '@/types/exam-prep';
+import { useExamPrep } from '@/contexts/ExamPrepContext';
 import {
   BarChart3,
   Target,
@@ -24,6 +25,7 @@ import {
   Loader2,
   Brain,
   Sparkles,
+  CalendarDays,
 } from 'lucide-react';
 
 export default function ExamPrepDashboard() {
@@ -31,6 +33,7 @@ export default function ExamPrepDashboard() {
   const navigate = useNavigate();
   const [license, setLicense] = useState<LicenseType | null>(null);
   const { data, loading } = useDashboardData(license);
+  const { activePlan } = useExamPrep();
 
   if (!isAuthenticated) {
     return (
@@ -130,6 +133,75 @@ export default function ExamPrepDashboard() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Study Plan Card */}
+          {activePlan && (
+            <Card className="border-indigo-200 bg-indigo-50/30">
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-indigo-800 flex items-center gap-2">
+                    <CalendarDays className="w-4 h-4" />
+                    Your Study Plan
+                  </h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-indigo-600 text-xs"
+                    onClick={() => navigate('/plan')}
+                  >
+                    View Full Plan <ArrowRight className="w-3 h-3 ml-1" />
+                  </Button>
+                </div>
+                {(() => {
+                  const completedWeeks = activePlan.completedWeeks ?? [];
+                  const currentWeek = activePlan.plan.weeklyPlan.find(
+                    (w) => !completedWeeks.includes(w.week),
+                  );
+                  if (!currentWeek) {
+                    return (
+                      <p className="text-sm text-emerald-700 font-medium">
+                        All weeks completed! Take a quiz to test your readiness.
+                      </p>
+                    );
+                  }
+                  return (
+                    <div>
+                      <p className="text-sm text-slate-700 mb-1">
+                        <span className="font-medium">Week {currentWeek.week}:</span>{' '}
+                        {currentWeek.focus}
+                      </p>
+                      <p className="text-xs text-slate-500 mb-3">
+                        {completedWeeks.length}/{activePlan.plan.weeklyPlan.length} weeks completed
+                      </p>
+                      <Button
+                        size="sm"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-xs"
+                        onClick={() => navigate('/plan')}
+                      >
+                        <Sparkles className="w-3 h-3 mr-1" />
+                        Continue Studying
+                      </Button>
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+          )}
+
+          {!activePlan && (
+            <Card className="border-slate-200">
+              <CardContent className="p-5 flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-slate-800 text-sm">No study plan yet</p>
+                  <p className="text-xs text-slate-500">Take the assessment to get a personalized plan.</p>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => navigate('/assessment')}>
+                  <Brain className="w-3 h-3 mr-1" />
+                  Assess
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Domain Progress Bars */}
           <Card className="border-slate-200">

@@ -11,6 +11,8 @@ import {
   Menu,
   X,
   ClipboardCheck,
+  CalendarDays,
+  FolderOpen,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -22,8 +24,10 @@ export default function ExamPrepNav() {
   const navLinks = [
     { to: '/', label: 'Home', icon: BookOpen },
     ...(isAuthenticated ? [{ to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }] : []),
+    ...(isAuthenticated ? [{ to: '/plan', label: 'Study Plan', icon: CalendarDays }] : []),
     { to: '/generator', label: 'Generator', icon: FileText },
     { to: '/quiz', label: 'Quiz', icon: ClipboardCheck },
+    ...(isAuthenticated ? [{ to: '/saved', label: 'My Materials', icon: FolderOpen }] : []),
     { to: '/assessment', label: 'Weak Areas', icon: Brain },
   ];
 
