@@ -4,7 +4,7 @@ import { useExamPrep } from '@/contexts/ExamPrepContext';
 import { useAuth } from '@/hooks/use-auth';
 import { EXAM_DATA } from '@/data/exam-prep-data';
 import { generateQuizBatches } from '@/lib/exam-prep-ai';
-import { saveQuizSession } from '@/lib/exam-prep-storage';
+import { saveQuizSession, saveQuizSessionAsync } from '@/lib/exam-prep-storage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -296,6 +296,12 @@ export default function ExamPrepQuiz() {
       score: results.filter((r) => r.isCorrect).length,
     };
     saveQuizSession(session);
+
+    // Save to Supabase if authenticated
+    if (user?.id) {
+      saveQuizSessionAsync(user.id, session).catch(() => {});
+    }
+
     setState('review');
   }
 

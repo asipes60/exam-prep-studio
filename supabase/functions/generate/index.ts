@@ -259,6 +259,8 @@ function getResponseSchema(studyFormat: string) {
       return studyGuideSchema;
     case "quick_reference":
       return quickReferenceSchema;
+    case "study_plan":
+      return studyPlanSchema;
     default:
       // Backward compat: old formats that used question arrays
       return { type: "ARRAY", items: questionSchema };

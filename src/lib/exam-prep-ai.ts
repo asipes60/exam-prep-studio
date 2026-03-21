@@ -402,8 +402,98 @@ export async function generateQuizBatches(
 
 export async function generateWeakAreaPlan(
   license: LicenseType,
-  weakAreas: string[]
+  weakAreas: string[],
+  strongAreas: string[] = [],
+  examDate?: string,
+  userId?: string,
 ): Promise<StudyPlan> {
-  await delay(2000);
-  return getSeedStudyPlan(license, weakAreas);
+  const exam = EXAM_DATA[license];
+
+  const systemPrompt = `You are an expert study plan designer for California mental health licensure exams.
+
+Create a personalized 6-8 week study plan for the ${exam.title} (${exam.id}).
+The plan should heavily weight the student's weak areas while maintaining coverage of strong areas.
+
+GUIDELINES:
+- Front-load weak areas in the first half of the plan.
+- Use a variety of study formats: practice_questions, clinical_vignette, flashcards, study_guide, quick_reference.
+- Include review cycles — don't just cover a topic once.
+- Week 7-8 should focus on mock exams and comprehensive review.
+- Keep it realistic: 5-7 study hours per week for working professionals.
+- Be specific to the ${exam.shortTitle} exam content domains.
+
+Assign the plan a unique id starting with "sp-".`;
+
+  const examDateLine = examDate
+    ? `\nThe student's exam date is ${examDate}. Adjust the plan intensity accordingly.`
+    : '';
+
+  const userPrompt = `Create a personalized study plan for the ${exam.shortTitle} exam.
+
+Weak areas (need heavy focus): ${weakAreas.length > 0 ? weakAreas.join(', ') : 'None identified'}
+Strong areas (lighter review): ${strongAreas.length > 0 ? strongAreas.join(', ') : 'None identified'}${examDateLine}
+
+Generate a structured 6-8 week plan with weekly focus topics, recommended material types, review cadence, and practice frequency.`;
+
+  try {
+    const config: GeneratorConfig = {
+      licenseType: license,
+      studyFormat: 'study_plan',
+      topic: weakAreas.join(', ') || 'General Review',
+      difficulty: 'exam_level',
+      itemCount: 1,
+      includeRationales: false,
+      californiaEmphasis: true,
+      isBeginnerReview: false,
+    };
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      throw new Error('Not authenticated');
+    }
+
+    const res = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL || 'https://axcwegrylfnadgbzgqnv.supabase.co'}/functions/v1/generate`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4Y3dlZ3J5bGZuYWRnYnpncW52Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MTk1NjQsImV4cCI6MjA4OTQ5NTU2NH0.ssSoyXjKpN8jcorVi2_suqRCSS_hs6nRqNVJnBUj6_Y',
+        },
+        body: JSON.stringify({
+          systemPrompt,
+          userPrompt,
+          studyFormat: 'study_plan',
+          config: {
+            licenseType: license,
+            topic: weakAreas.join(', ') || 'General Review',
+            difficulty: 'exam_level',
+            itemCount: 1,
+            includeRationales: false,
+            californiaEmphasis: true,
+            isBeginnerReview: false,
+          },
+        }),
+      },
+    );
+
+    if (!res.ok) {
+      throw new Error(`Edge function returned ${res.status}`);
+    }
+
+    const result = await res.json();
+    const plan = result.data as StudyPlan;
+
+    // Ensure required fields
+    return {
+      ...plan,
+      id: plan.id || `sp-${Date.now()}`,
+      licenseType: license,
+      weakAreas: weakAreas,
+    };
+  } catch (err) {
+    console.warn('Gemini study plan generation failed, using seed plan:', err);
+    return getSeedStudyPlan(license, weakAreas);
+  }
 }

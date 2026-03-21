@@ -204,7 +204,7 @@ export function moveMaterialToFolder(_materialId: string, _folderId: string | un
   // no-op
 }
 
-// ─── Quiz Sessions (localStorage — not worth migrating yet) ─────────────
+// ─── Quiz Sessions (Supabase + localStorage fallback) ───────────────────
 
 export function getQuizSessions(): QuizSession[] {
   return getLocal<QuizSession[]>(STORAGE_KEYS.QUIZ_SESSIONS, []);
@@ -221,7 +221,57 @@ export function saveQuizSession(session: QuizSession): void {
   setLocal(STORAGE_KEYS.QUIZ_SESSIONS, sessions);
 }
 
-// ─── Weak Area Assessments (localStorage) ───────────────────────────────
+export async function saveQuizSessionAsync(
+  userId: string,
+  session: QuizSession,
+): Promise<void> {
+  await supabase.from('exam_prep_quiz_sessions').insert({
+    user_id: userId,
+    license_type: session.licenseType,
+    mode: session.mode,
+    format: session.format ?? 'practice_questions',
+    topic: 'General Review',
+    questions: session.questions as unknown as Record<string, unknown>[],
+    results: session.results as unknown as Record<string, unknown>[],
+    started_at: session.startedAt,
+    completed_at: session.completedAt,
+    score: session.score,
+  });
+}
+
+export async function getQuizSessionsAsync(
+  userId: string,
+  licenseType?: LicenseType,
+  limit = 10,
+): Promise<QuizSession[]> {
+  let query = supabase
+    .from('exam_prep_quiz_sessions')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (licenseType) {
+    query = query.eq('license_type', licenseType);
+  }
+
+  const { data, error } = await query;
+  if (error || !data) return [];
+
+  return data.map((row) => ({
+    id: row.id,
+    licenseType: row.license_type as LicenseType,
+    mode: row.mode as 'study' | 'test',
+    format: (row.format ?? 'practice_questions') as 'practice_questions' | 'clinical_vignette',
+    questions: row.questions as unknown as QuizSession['questions'],
+    results: row.results as unknown as QuizSession['results'],
+    startedAt: row.started_at,
+    completedAt: row.completed_at ?? undefined,
+    score: row.score ?? undefined,
+  }));
+}
+
+// ─── Weak Area Assessments (Supabase + localStorage fallback) ───────────
 
 export function getAssessments(): WeakAreaAssessmentResult[] {
   return getLocal<WeakAreaAssessmentResult[]>(STORAGE_KEYS.ASSESSMENTS, []);
@@ -231,6 +281,120 @@ export function saveAssessment(result: WeakAreaAssessmentResult): void {
   const assessments = getAssessments();
   assessments.unshift(result);
   setLocal(STORAGE_KEYS.ASSESSMENTS, assessments);
+}
+
+export async function saveAssessmentAsync(
+  userId: string,
+  result: WeakAreaAssessmentResult,
+  licenseType: LicenseType,
+): Promise<void> {
+  await supabase.from('exam_prep_assessments').insert({
+    user_id: userId,
+    license_type: licenseType,
+    ratings: result.ratings as unknown as Record<string, unknown>[],
+    weak_areas: result.weakAreas,
+    strong_areas: result.strongAreas,
+    suggested_plan: result.suggestedPlan as unknown as Record<string, unknown>,
+  });
+  // Also save to localStorage as fallback
+  saveAssessment(result);
+}
+
+export async function getAssessmentsAsync(
+  userId: string,
+  licenseType?: LicenseType,
+): Promise<WeakAreaAssessmentResult[]> {
+  let query = supabase
+    .from('exam_prep_assessments')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (licenseType) {
+    query = query.eq('license_type', licenseType);
+  }
+
+  const { data, error } = await query;
+  if (error || !data) return getAssessments(); // fallback to localStorage
+
+  return data.map((row) => ({
+    ratings: row.ratings as unknown as WeakAreaAssessmentResult['ratings'],
+    weakAreas: row.weak_areas ?? [],
+    strongAreas: row.strong_areas ?? [],
+    suggestedPlan: row.suggested_plan as unknown as WeakAreaAssessmentResult['suggestedPlan'],
+  }));
+}
+
+// ─── Domain Scores (Supabase) ───────────────────────────────────────────
+
+export interface DomainScoreRow {
+  domainId: string;
+  domainName: string;
+  totalQuestions: number;
+  correctAnswers: number;
+  lastQuizAt: string;
+}
+
+export async function getDomainScores(
+  userId: string,
+  licenseType: LicenseType,
+): Promise<DomainScoreRow[]> {
+  const { data, error } = await supabase
+    .from('exam_prep_domain_scores')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('license_type', licenseType);
+
+  if (error || !data) return [];
+
+  return data.map((row) => ({
+    domainId: row.domain_id,
+    domainName: row.domain_name,
+    totalQuestions: row.total_questions,
+    correctAnswers: row.correct_answers,
+    lastQuizAt: row.last_quiz_at,
+  }));
+}
+
+export async function saveDomainScores(
+  userId: string,
+  licenseType: LicenseType,
+  scores: { domainId: string; domainName: string; correct: number; total: number }[],
+): Promise<void> {
+  // Upsert each domain score — accumulate totals
+  for (const score of scores) {
+    // Try to read existing first
+    const { data: existing } = await supabase
+      .from('exam_prep_domain_scores')
+      .select('total_questions, correct_answers')
+      .eq('user_id', userId)
+      .eq('license_type', licenseType)
+      .eq('domain_id', score.domainId)
+      .single();
+
+    if (existing) {
+      await supabase
+        .from('exam_prep_domain_scores')
+        .update({
+          total_questions: existing.total_questions + score.total,
+          correct_answers: existing.correct_answers + score.correct,
+          last_quiz_at: new Date().toISOString(),
+        })
+        .eq('user_id', userId)
+        .eq('license_type', licenseType)
+        .eq('domain_id', score.domainId);
+    } else {
+      await supabase.from('exam_prep_domain_scores').insert({
+        user_id: userId,
+        license_type: licenseType,
+        domain_id: score.domainId,
+        domain_name: score.domainName,
+        total_questions: score.total,
+        correct_answers: score.correct,
+        last_quiz_at: new Date().toISOString(),
+      });
+    }
+  }
 }
 
 // ─── Recent Config (localStorage) ──────────────────────────────────────

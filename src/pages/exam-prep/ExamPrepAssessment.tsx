@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useExamPrep } from '@/contexts/ExamPrepContext';
+import { useAuth } from '@/hooks/use-auth';
 import { EXAM_DATA } from '@/data/exam-prep-data';
 import { generateWeakAreaPlan } from '@/lib/exam-prep-ai';
-import { saveAssessment } from '@/lib/exam-prep-storage';
+import { saveAssessment, saveAssessmentAsync } from '@/lib/exam-prep-storage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -16,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { LicenseType, WeakAreaRating, StudyPlan } from '@/types/exam-prep';
-import { Brain, ArrowRight, CheckCircle, AlertTriangle, Loader2, Sparkles } from 'lucide-react';
+import { Brain, ArrowRight, CheckCircle, AlertTriangle, Loader2, Sparkles, Calendar } from 'lucide-react';
 
 type AssessmentStep = 'choose' | 'rate' | 'results';
 
@@ -30,6 +33,7 @@ const ratingLabels: Record<number, string> = {
 
 export default function ExamPrepAssessment() {
   const { setSelectedLicense } = useExamPrep();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [step, setStep] = useState<AssessmentStep>('choose');
@@ -37,6 +41,7 @@ export default function ExamPrepAssessment() {
   const [license, setLicense] = useState<LicenseType | null>(null);
   const [ratings, setRatings] = useState<WeakAreaRating[]>([]);
   const [manualWeakAreas, setManualWeakAreas] = useState<string[]>([]);
+  const [examDate, setExamDate] = useState('');
   const [generatedPlan, setGeneratedPlan] = useState<StudyPlan | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -86,15 +91,28 @@ export default function ExamPrepAssessment() {
         : [];
 
     try {
-      const plan = await generateWeakAreaPlan(license, weakAreas);
+      const plan = await generateWeakAreaPlan(
+        license,
+        weakAreas,
+        strongAreas,
+        examDate || undefined,
+        user?.id,
+      );
       setGeneratedPlan(plan);
 
-      saveAssessment({
+      const assessmentResult = {
         ratings,
         weakAreas,
         strongAreas,
         suggestedPlan: plan,
-      });
+      };
+
+      // Save to Supabase if authenticated, otherwise localStorage
+      if (user?.id) {
+        saveAssessmentAsync(user.id, assessmentResult, license).catch(() => {});
+      } else {
+        saveAssessment(assessmentResult);
+      }
 
       setStep('results');
     } catch (err) {
@@ -145,6 +163,23 @@ export default function ExamPrepAssessment() {
                   ))}
                 </SelectContent>
               </Select>
+              {license && (
+                <div className="mt-4">
+                  <Label className="text-sm font-medium text-slate-700 mb-1.5 block">
+                    <Calendar className="w-4 h-4 inline mr-1" />
+                    Exam Date (optional)
+                  </Label>
+                  <Input
+                    type="date"
+                    value={examDate}
+                    onChange={(e) => setExamDate(e.target.value)}
+                    className="max-w-xs"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">
+                    We'll adjust your study plan intensity based on how much time you have.
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
