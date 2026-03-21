@@ -25,6 +25,10 @@ interface ExamPrepState {
   generateContent: (config: GeneratorConfig) => Promise<void>;
   latestAuditEntryId: string | null;
 
+  // Pending generation (set by assessment, consumed by generator)
+  pendingConfig: GeneratorConfig | null;
+  setPendingConfig: (config: GeneratorConfig | null) => void;
+
   // Saved Materials
   savedMaterials: SavedMaterial[];
   folders: Folder[];
@@ -55,6 +59,7 @@ export function ExamPrepProvider({ children }: { children: React.ReactNode }) {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [activeQuiz, setActiveQuiz] = useState<QuizSession | null>(null);
   const [studyMode, setStudyMode] = useState<StudyMode>('study');
+  const [pendingConfig, setPendingConfig] = useState<GeneratorConfig | null>(null);
 
   // Load saved materials and folders from Supabase when user changes
   useEffect(() => {
@@ -163,6 +168,8 @@ export function ExamPrepProvider({ children }: { children: React.ReactNode }) {
         isGenerating,
         generateContent,
         latestAuditEntryId,
+        pendingConfig,
+        setPendingConfig,
         savedMaterials,
         folders,
         saveMaterial: handleSaveMaterial,

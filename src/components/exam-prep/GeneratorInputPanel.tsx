@@ -18,7 +18,7 @@ import { getExamFormat } from '@/types/exam-prep';
 import { Sparkles, Loader2 } from 'lucide-react';
 
 export default function GeneratorInputPanel() {
-  const { selectedLicense, setSelectedLicense, generateContent, isGenerating } = useExamPrep();
+  const { selectedLicense, setSelectedLicense, generateContent, isGenerating, pendingConfig, setPendingConfig } = useExamPrep();
 
   const [studyFormat, setStudyFormat] = useState<StudyFormat>('practice_questions');
   const [topic, setTopic] = useState('');
@@ -34,6 +34,22 @@ export default function GeneratorInputPanel() {
       setStudyFormat(defaultFormat);
     }
   }, [selectedLicense]);
+
+  // Pick up pending config from assessment and auto-generate
+  useEffect(() => {
+    if (pendingConfig && !isGenerating) {
+      setStudyFormat(pendingConfig.studyFormat);
+      setSelectedTopic(pendingConfig.topic);
+      setTopic('');
+      setItemCount(pendingConfig.itemCount);
+      setIncludeRationales(pendingConfig.includeRationales);
+      setCaliforniaEmphasis(pendingConfig.californiaEmphasis);
+
+      // Clear pending and trigger generation
+      setPendingConfig(null);
+      generateContent(pendingConfig);
+    }
+  }, [pendingConfig]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const examInfo = selectedLicense ? EXAM_DATA[selectedLicense] : null;
 

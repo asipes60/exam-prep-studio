@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { LicenseType, WeakAreaRating, StudyPlan } from '@/types/exam-prep';
+import type { LicenseType, WeakAreaRating, StudyPlan, StudyFormat } from '@/types/exam-prep';
 import { Brain, ArrowRight, CheckCircle, AlertTriangle, Loader2, Sparkles, Calendar } from 'lucide-react';
 
 type AssessmentStep = 'choose' | 'rate' | 'results';
@@ -32,7 +32,7 @@ const ratingLabels: Record<number, string> = {
 };
 
 export default function ExamPrepAssessment() {
-  const { setSelectedLicense } = useExamPrep();
+  const { setSelectedLicense, setPendingConfig } = useExamPrep();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -123,10 +123,32 @@ export default function ExamPrepAssessment() {
   }
 
   function handleGoToGenerator() {
-    if (license) {
-      setSelectedLicense(license);
-      navigate('/generator');
-    }
+    if (!license || !generatedPlan) return;
+
+    setSelectedLicense(license);
+
+    // Build a generator config from the first week of the study plan
+    const firstWeek = generatedPlan.weeklyPlan[0];
+    const topic = firstWeek?.topics?.[0] || generatedPlan.weakAreas[0] || 'General Review';
+    const format = firstWeek?.materialTypes?.[0] || 'practice_questions';
+
+    // Determine appropriate item count based on format
+    const itemCount = format === 'clinical_vignette' ? 1
+      : format === 'study_guide' || format === 'quick_reference' ? 1
+      : 10;
+
+    setPendingConfig({
+      licenseType: license,
+      studyFormat: format as StudyFormat,
+      topic,
+      difficulty: 'exam_level',
+      itemCount,
+      includeRationales: true,
+      californiaEmphasis: true,
+      isBeginnerReview: false,
+    });
+
+    navigate('/generator');
   }
 
   return (
