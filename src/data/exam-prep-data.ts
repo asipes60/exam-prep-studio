@@ -12,144 +12,278 @@ import type {
   ClinicalVignette,
 } from '@/types/exam-prep';
 
-// ─── Topic Categories by Exam ──────────────────────────────────────────
+// ─── Official Exam Domain Categories ─────────────────────────────────
 
-const sharedLawEthicsTopics: TopicCategory[] = [
+// LPCC — NCMHCE (6 domains)
+const lpccDomains: TopicCategory[] = [
   {
-    id: 'law_ethics',
-    name: 'Law & Ethics',
+    id: 'lpcc_ethics',
+    name: 'Professional Practice & Ethics (15%)',
     topics: [
-      'Confidentiality & privilege',
-      'Mandated reporting',
-      'Duty to protect (Tarasoff)',
-      'Informed consent',
-      'Documentation & record keeping',
-      'Scope of practice',
-      'Supervision requirements',
-      'Professional boundaries',
-      'Telehealth regulations',
-      'Child abuse reporting (CANRA)',
-      'Elder & dependent adult abuse',
-      'Minor consent laws',
-      'Dual relationships',
-      'Advertising & solicitation',
-      'Board complaint process',
+      'Ethical decision-making models',
+      'Informed consent & confidentiality',
+      'Scope of practice & referral',
+      'Professional boundaries & dual relationships',
+      'Supervision & consultation standards',
+      'Cultural competence in ethical practice',
     ],
   },
-];
-
-const clinicalTopics: TopicCategory[] = [
   {
-    id: 'assessment',
-    name: 'Clinical Assessment & Diagnosis',
+    id: 'lpcc_assessment',
+    name: 'Intake, Assessment & Diagnosis (25%)',
     topics: [
-      'Mental status examination',
+      'Clinical interview & mental status exam',
       'DSM-5-TR diagnostic criteria',
       'Risk assessment & suicide screening',
       'Biopsychosocial assessment',
-      'Cultural considerations in assessment',
       'Differential diagnosis',
-      'Psychological testing basics',
+      'Cultural considerations in assessment',
+      'Psychological testing & measurement',
+      'Co-occurring disorder identification',
     ],
   },
   {
-    id: 'treatment',
-    name: 'Treatment Planning & Interventions',
+    id: 'lpcc_treatment_planning',
+    name: 'Treatment Planning (15%)',
     topics: [
-      'Evidence-based treatment planning',
-      'CBT fundamentals',
+      'Evidence-based treatment selection',
+      'Measurable goals & objectives',
+      'Client strengths & resources',
+      'Level of care decisions',
+      'Collaborative treatment planning',
+      'Treatment plan review & modification',
+    ],
+  },
+  {
+    id: 'lpcc_interventions',
+    name: 'Counseling Skills & Interventions (30%)',
+    topics: [
+      'CBT techniques & applications',
       'DBT skills & applications',
       'Solution-focused brief therapy',
       'Motivational interviewing',
-      'Person-centered therapy',
-      'Psychodynamic approaches',
-      'Trauma-informed care',
-      'Crisis intervention',
-      'Safety planning',
-    ],
-  },
-  {
-    id: 'special_populations',
-    name: 'Special Populations & Issues',
-    topics: [
-      'Substance use disorders',
-      'Co-occurring disorders',
-      'Child & adolescent counseling',
-      'Older adult considerations',
-      'Cultural humility & competence',
-      'LGBTQ+ affirming practices',
-      'Disability considerations',
-      'Immigrant & refugee populations',
-    ],
-  },
-  {
-    id: 'professional',
-    name: 'Professional Practice',
-    topics: [
-      'Supervision models',
-      'Consultation & collaboration',
-      'Self-care & burnout prevention',
-      'Research & program evaluation',
-      'Advocacy & social justice',
-      'Managed care & insurance',
-    ],
-  },
-];
-
-const lpccSpecificTopics: TopicCategory[] = [
-  {
-    id: 'counseling_theory',
-    name: 'Counseling Theory & Practice',
-    topics: [
-      'Counseling theories overview',
-      'Career counseling & development',
+      'Person-centered & humanistic approaches',
+      'Trauma-informed interventions',
+      'Crisis intervention & safety planning',
       'Group counseling techniques',
-      'Human growth & development',
-      'Multicultural counseling',
-      'Rehabilitation counseling',
-      'School counseling considerations',
+    ],
+  },
+  {
+    id: 'lpcc_attributes',
+    name: 'Core Counseling Attributes (15%)',
+    topics: [
+      'Therapeutic alliance & rapport building',
+      'Empathy, genuineness & unconditional positive regard',
+      'Self-awareness & self-care',
+      'Multicultural counseling competence',
+      'Counselor impairment & burnout prevention',
+    ],
+  },
+  {
+    id: 'lpcc_clinical_focus',
+    name: 'Areas of Clinical Focus (cross-cutting)',
+    topics: [
+      'Substance use & addictive disorders',
+      'Child & adolescent counseling',
+      'Couples & family counseling',
+      'Career & life transitions',
+      'Older adult considerations',
+      'LGBTQ+ affirming practices',
     ],
   },
 ];
 
-const lmftSpecificTopics: TopicCategory[] = [
+// LMFT — AMFTRB National Exam (6 domains)
+const lmftDomains: TopicCategory[] = [
   {
-    id: 'family_systems',
-    name: 'Family & Systems Therapy',
+    id: 'lmft_systemic',
+    name: 'The Practice of Systemic Therapy (23%)',
     topics: [
+      'Systems theory & circular causality',
       'Structural family therapy',
-      'Strategic family therapy',
-      'Bowenian family systems',
-      'Narrative therapy',
-      'Gottman method basics',
+      'Strategic & solution-focused approaches',
+      'Bowenian family systems theory',
       'Emotionally focused therapy (EFT)',
-      'Family life cycle',
+      'Narrative & collaborative therapies',
+      'Gottman method & couples work',
+    ],
+  },
+  {
+    id: 'lmft_assessment',
+    name: 'Assessing, Hypothesizing & Diagnosing (14%)',
+    topics: [
+      'Relational & systemic assessment',
       'Genograms & family mapping',
-      'Couples therapy approaches',
-      'Divorce & blended families',
-      'Parent-child relational issues',
-      'Domestic violence considerations',
+      'DSM-5-TR from a relational perspective',
+      'Risk assessment in family systems',
+      'Cultural factors in systemic assessment',
+      'Intergenerational patterns',
+    ],
+  },
+  {
+    id: 'lmft_treatment',
+    name: 'Designing & Conducting Treatment (12%)',
+    topics: [
+      'Systemic treatment planning',
+      'Matching interventions to family structure',
+      'Working with subsystems',
+      'Managing family-of-origin issues',
+      'Integrating individual & relational work',
+    ],
+  },
+  {
+    id: 'lmft_process',
+    name: 'Evaluating Ongoing Process & Terminating Treatment (18%)',
+    topics: [
+      'Monitoring therapeutic progress',
+      'Adjusting treatment based on feedback',
+      'Relapse prevention in family systems',
+      'Criteria for termination',
+      'Managing premature termination',
+      'Follow-up & maintenance planning',
+    ],
+  },
+  {
+    id: 'lmft_crisis',
+    name: 'Managing Crisis Situations (14%)',
+    topics: [
+      'Domestic violence assessment & safety planning',
+      'Suicidality in relational contexts',
+      'Child & elder abuse in families',
+      'Substance abuse in family systems',
+      'Crisis intervention with couples & families',
+      'Mandated reporting obligations',
+    ],
+  },
+  {
+    id: 'lmft_ethics',
+    name: 'Maintaining Ethical, Legal & Professional Standards (19%)',
+    topics: [
+      'Confidentiality with multiple clients',
+      'Duty to warn & protect',
+      'Boundaries in couples & family therapy',
+      'Informed consent for systemic therapy',
+      'Record keeping & documentation',
+      'Supervision & professional development',
+      'Telehealth ethics & regulations',
     ],
   },
 ];
 
-const lcswSpecificTopics: TopicCategory[] = [
+// LCSW — ASWB Clinical Exam (4 domains)
+const lcswDomains: TopicCategory[] = [
   {
-    id: 'social_work',
-    name: 'Social Work Practice',
+    id: 'lcsw_human_dev',
+    name: 'Human Development, Diversity & Behavior in the Environment (24%)',
     topics: [
-      'Systems theory & ecological model',
-      'Case management',
-      'Community organization',
-      'Social welfare policy',
-      'Macro social work practice',
-      'Group work',
-      'Child welfare system',
-      'Healthcare social work',
-      'School-based social work',
-      'Aging & gerontological social work',
-      'Social justice & advocacy',
+      'Human growth & development across the lifespan',
+      'Systems theory & ecological perspective',
+      'Cultural humility & intersectionality',
+      'Impact of trauma on development',
+      'Family dynamics & family life cycle',
+      'Effects of discrimination & oppression',
       'Human behavior in the social environment',
+    ],
+  },
+  {
+    id: 'lcsw_assessment',
+    name: 'Assessment, Diagnosis & Treatment Planning (30%)',
+    topics: [
+      'Biopsychosocial assessment',
+      'DSM-5-TR diagnostic criteria',
+      'Risk & safety assessment',
+      'Differential diagnosis',
+      'Strengths-based assessment',
+      'Evidence-based treatment planning',
+      'Cultural considerations in diagnosis',
+      'Co-occurring disorders',
+    ],
+  },
+  {
+    id: 'lcsw_interventions',
+    name: 'Psychotherapy, Clinical Interventions & Case Management (27%)',
+    topics: [
+      'CBT & cognitive restructuring',
+      'Trauma-informed care & EMDR',
+      'Motivational interviewing',
+      'Crisis intervention & safety planning',
+      'Group therapy facilitation',
+      'Case management & care coordination',
+      'Psychodynamic & psychoanalytic approaches',
+    ],
+  },
+  {
+    id: 'lcsw_ethics',
+    name: 'Professional Values & Ethics (19%)',
+    topics: [
+      'NASW Code of Ethics',
+      'Confidentiality & informed consent',
+      'Duty to warn & mandatory reporting',
+      'Professional boundaries & dual relationships',
+      'Social justice & advocacy',
+      'Supervision & professional development',
+    ],
+  },
+];
+
+// LAW_ETHICS — California-Specific (reorganized under exam-relevant headings)
+const lawEthicsDomains: TopicCategory[] = [
+  {
+    id: 'le_confidentiality',
+    name: 'Confidentiality & Privilege',
+    topics: [
+      'Psychotherapist-patient privilege',
+      'Exceptions to confidentiality',
+      'Duty to protect (Tarasoff)',
+      'Minor consent & confidentiality',
+      'HIPAA & state law interaction',
+      'Confidentiality in group & couples therapy',
+    ],
+  },
+  {
+    id: 'le_mandated',
+    name: 'Mandated Reporting',
+    topics: [
+      'Child abuse reporting (CANRA)',
+      'Elder & dependent adult abuse reporting',
+      'Reasonable suspicion standard',
+      'Reporting procedures & timelines',
+      'Immunity & failure-to-report consequences',
+    ],
+  },
+  {
+    id: 'le_practice',
+    name: 'Professional Practice & Licensing',
+    topics: [
+      'BBS structure & functions',
+      'Scope of practice by license type',
+      'Associate registration & supervision requirements',
+      'Continuing education requirements',
+      'License renewal & disciplinary actions',
+      'Title protection & advertising rules',
+      'Fee disclosure requirements',
+    ],
+  },
+  {
+    id: 'le_boundaries',
+    name: 'Boundaries & Professional Conduct',
+    topics: [
+      'Dual & multiple relationships',
+      'Sexual misconduct prohibitions',
+      'Informed consent requirements',
+      'Documentation & record keeping',
+      'Termination & abandonment issues',
+    ],
+  },
+  {
+    id: 'le_special',
+    name: 'Special Topics in California Law',
+    topics: [
+      'Telehealth regulations & interstate practice',
+      'Business & Professions Code key sections',
+      'Board complaint & hearing process',
+      'Suicide prevention training requirements',
+      'Minors\' rights to treatment',
     ],
   },
 ];
@@ -167,19 +301,19 @@ export const EXAM_DATA: Record<LicenseType, ExamInfo> = {
     color: 'text-blue-700',
     bgColor: 'bg-blue-50',
     borderColor: 'border-blue-200',
-    categories: [...sharedLawEthicsTopics, ...clinicalTopics, ...lpccSpecificTopics],
+    categories: lpccDomains,
   },
   LMFT: {
     id: 'LMFT',
     title: 'Licensed Marriage & Family Therapist',
     shortTitle: 'LMFT Exam Prep',
     description:
-      'Prepare for the MFT California Law & Ethics Exam and national MFT licensing examinations.',
+      'Prepare for the AMFTRB National Exam and California MFT licensing examinations.',
     icon: 'Users',
     color: 'text-emerald-700',
     bgColor: 'bg-emerald-50',
     borderColor: 'border-emerald-200',
-    categories: [...sharedLawEthicsTopics, ...clinicalTopics, ...lmftSpecificTopics],
+    categories: lmftDomains,
   },
   LCSW: {
     id: 'LCSW',
@@ -191,7 +325,7 @@ export const EXAM_DATA: Record<LicenseType, ExamInfo> = {
     color: 'text-purple-700',
     bgColor: 'bg-purple-50',
     borderColor: 'border-purple-200',
-    categories: [...sharedLawEthicsTopics, ...clinicalTopics, ...lcswSpecificTopics],
+    categories: lcswDomains,
   },
   LAW_ETHICS: {
     id: 'LAW_ETHICS',
@@ -203,40 +337,16 @@ export const EXAM_DATA: Record<LicenseType, ExamInfo> = {
     color: 'text-amber-700',
     bgColor: 'bg-amber-50',
     borderColor: 'border-amber-200',
-    categories: [
-      ...sharedLawEthicsTopics,
-      {
-        id: 'ca_specific',
-        name: 'California-Specific Regulations',
-        topics: [
-          'BBS structure & functions',
-          'Associate registration requirements',
-          'Supervision hour requirements',
-          'Continuing education requirements',
-          'License renewal process',
-          'Disciplinary actions & hearings',
-          'Interstate practice & telehealth',
-          'Business & professions code highlights',
-          'Title protection & scope',
-          'Fee disclosure requirements',
-        ],
-      },
-    ],
+    categories: lawEthicsDomains,
   },
 };
 
 export const STUDY_FORMAT_OPTIONS: { id: StudyFormat; label: string; description: string; icon: string }[] = [
   { id: 'practice_questions', label: 'Practice Questions', description: 'Multiple-choice questions with rationales', icon: 'HelpCircle' },
-  { id: 'scenario_questions', label: 'Scenario-Based Questions', description: 'Clinical vignettes with analysis', icon: 'FileText' },
-  { id: 'clinical_vignette', label: 'Clinical Vignettes (Exam-Style)', description: 'Multi-question case studies testing multiple competencies', icon: 'ClipboardList' },
+  { id: 'clinical_vignette', label: 'Clinical Vignettes', description: 'Exam-style case studies testing multiple competencies', icon: 'ClipboardList' },
   { id: 'flashcards', label: 'Flashcards', description: 'Quick-review front/back cards', icon: 'Layers' },
   { id: 'study_guide', label: 'Study Guide', description: 'Comprehensive topic overview', icon: 'BookOpen' },
-  { id: 'quick_reference', label: 'Quick Reference Sheet', description: 'At-a-glance key facts', icon: 'ClipboardList' },
-  { id: 'mini_quiz', label: 'Mini Quiz', description: '5-10 question focused quiz', icon: 'CheckSquare' },
-  { id: 'mock_exam', label: 'Mock Exam Set', description: 'Full-length practice exam section', icon: 'Award' },
-  { id: 'law_ethics_spotter', label: 'Law & Ethics Spotter', description: 'Identify legal/ethical issues in scenarios', icon: 'Scale' },
-  { id: 'rationale_review', label: 'Rationale Review', description: 'Deep-dive into why answers are correct', icon: 'Lightbulb' },
-  { id: 'study_plan', label: 'Personalized Study Plan', description: 'Custom weekly study schedule', icon: 'Calendar' },
+  { id: 'quick_reference', label: 'Quick Reference', description: 'At-a-glance key facts and exam tips', icon: 'ClipboardList' },
 ];
 
 // ─── Seed Content ───────────────────────────────────────────────────────

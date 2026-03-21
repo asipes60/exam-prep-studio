@@ -603,11 +603,6 @@ export default function GeneratorOutputPanel() {
 function renderContent(content: GeneratedContent) {
   switch (content.type) {
     case 'practice_questions':
-    case 'scenario_questions':
-    case 'mini_quiz':
-    case 'mock_exam':
-    case 'law_ethics_spotter':
-    case 'rationale_review':
       return <QuestionsView questions={content.data} />;
     case 'clinical_vignette':
       return <ClinicalVignetteView vignettes={content.data} />;
@@ -619,8 +614,16 @@ function renderContent(content: GeneratedContent) {
       return <QuickReferenceView ref={content.data} />;
     case 'study_plan':
       return <StudyPlanView plan={content.data} />;
-    default:
+    default: {
+      // Backward compat: old saved materials with removed formats
+      // (scenario_questions, mini_quiz, mock_exam, law_ethics_spotter, rationale_review)
+      // all stored PracticeQuestion[] arrays — render them as questions
+      const data = (content as any).data;
+      if (Array.isArray(data) && data.length > 0 && 'stem' in data[0]) {
+        return <QuestionsView questions={data} />;
+      }
       return <p className="text-slate-500">Unknown content type.</p>;
+    }
   }
 }
 

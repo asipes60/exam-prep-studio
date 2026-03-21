@@ -4,16 +4,10 @@ export type LicenseType = 'LPCC' | 'LMFT' | 'LCSW' | 'LAW_ETHICS';
 
 export type StudyFormat =
   | 'practice_questions'
-  | 'scenario_questions'
   | 'clinical_vignette'
   | 'flashcards'
   | 'study_guide'
-  | 'quick_reference'
-  | 'mini_quiz'
-  | 'mock_exam'
-  | 'law_ethics_spotter'
-  | 'rationale_review'
-  | 'study_plan';
+  | 'quick_reference';
 
 export type DifficultyLevel = 'beginner' | 'intermediate' | 'exam_level';
 
@@ -146,15 +140,10 @@ export interface QuizSession {
 
 export type GeneratedContent =
   | { type: 'practice_questions'; data: PracticeQuestion[] }
-  | { type: 'scenario_questions'; data: PracticeQuestion[] }
   | { type: 'clinical_vignette'; data: ClinicalVignette[] }
   | { type: 'flashcards'; data: Flashcard[] }
   | { type: 'study_guide'; data: StudyGuide }
   | { type: 'quick_reference'; data: QuickReference }
-  | { type: 'mini_quiz'; data: PracticeQuestion[] }
-  | { type: 'mock_exam'; data: PracticeQuestion[] }
-  | { type: 'law_ethics_spotter'; data: PracticeQuestion[] }
-  | { type: 'rationale_review'; data: PracticeQuestion[] }
   | { type: 'study_plan'; data: StudyPlan };
 
 export interface SavedMaterial {

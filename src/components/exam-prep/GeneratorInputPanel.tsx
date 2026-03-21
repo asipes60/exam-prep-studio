@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { GeneratorConfig, LicenseType, StudyFormat, DifficultyLevel } from '@/types/exam-prep';
+import type { GeneratorConfig, LicenseType, StudyFormat } from '@/types/exam-prep';
 import { Sparkles, Loader2 } from 'lucide-react';
 
 export default function GeneratorInputPanel() {
@@ -22,11 +22,9 @@ export default function GeneratorInputPanel() {
   const [studyFormat, setStudyFormat] = useState<StudyFormat>('practice_questions');
   const [topic, setTopic] = useState('');
   const [selectedTopic, setSelectedTopic] = useState('');
-  const [difficulty, setDifficulty] = useState<DifficultyLevel>('intermediate');
   const [itemCount, setItemCount] = useState(5);
   const [includeRationales, setIncludeRationales] = useState(true);
   const [californiaEmphasis, setCaliforniaEmphasis] = useState(true);
-  const [isBeginnerReview, setIsBeginnerReview] = useState(false);
 
   const examInfo = selectedLicense ? EXAM_DATA[selectedLicense] : null;
 
@@ -41,11 +39,11 @@ export default function GeneratorInputPanel() {
       licenseType: selectedLicense,
       studyFormat,
       topic: topic.trim() || selectedTopic || 'General Review',
-      difficulty,
+      difficulty: 'exam_level',
       itemCount,
       includeRationales,
       californiaEmphasis,
-      isBeginnerReview,
+      isBeginnerReview: false,
     };
     generateContent(config);
   }
@@ -133,23 +131,8 @@ export default function GeneratorInputPanel() {
         />
       </div>
 
-      {/* Difficulty */}
-      <div>
-        <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Difficulty Level</Label>
-        <Select value={difficulty} onValueChange={(v) => setDifficulty(v as DifficultyLevel)}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="beginner">Beginner Review</SelectItem>
-            <SelectItem value="intermediate">Intermediate</SelectItem>
-            <SelectItem value="exam_level">Exam-Level Challenge</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
       {/* Number of Items */}
-      {studyFormat !== 'study_guide' && studyFormat !== 'study_plan' && studyFormat !== 'quick_reference' && (
+      {studyFormat !== 'study_guide' && studyFormat !== 'quick_reference' && (
         <div>
           <Label className="text-sm font-medium text-slate-700 mb-3 flex justify-between">
             <span>{studyFormat === 'clinical_vignette' ? 'Number of Vignettes' : 'Number of Items'}</span>
@@ -159,7 +142,7 @@ export default function GeneratorInputPanel() {
             value={[itemCount]}
             onValueChange={(v) => setItemCount(v[0])}
             min={1}
-            max={studyFormat === 'clinical_vignette' ? 5 : studyFormat === 'mock_exam' ? 50 : 20}
+            max={studyFormat === 'clinical_vignette' ? 5 : studyFormat === 'practice_questions' ? 25 : 20}
             step={1}
             className="mt-2"
           />
@@ -175,10 +158,6 @@ export default function GeneratorInputPanel() {
         <div className="flex items-center justify-between">
           <Label className="text-sm text-slate-700">California-Specific Emphasis</Label>
           <Switch checked={californiaEmphasis} onCheckedChange={setCaliforniaEmphasis} />
-        </div>
-        <div className="flex items-center justify-between">
-          <Label className="text-sm text-slate-700">Beginner Review Mode</Label>
-          <Switch checked={isBeginnerReview} onCheckedChange={setIsBeginnerReview} />
         </div>
       </div>
 

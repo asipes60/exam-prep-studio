@@ -1,17 +1,6 @@
 // EduCare Exam Prep Studio - AI Content Generation
-// This module contains mock generation logic with clearly marked placeholders
-// for Gemini API integration.
-//
-// ╔═══════════════════════════════════════════════════════════════════════╗
-// ║  GEMINI API INTEGRATION POINT                                       ║
-// ║  Replace the mock functions below with actual Gemini API calls.     ║
-// ║  Recommended model: gemini-1.5-pro or gemini-2.0-flash             ║
-// ║                                                                     ║
-// ║  1. Install: npm install @google/generative-ai                      ║
-// ║  2. Set VITE_GEMINI_API_KEY in .env                                ║
-// ║  3. Replace generateContent() calls below                          ║
-// ║  4. Add structured output parsing with Zod schemas                  ║
-// ╚═══════════════════════════════════════════════════════════════════════╝
+// Calls the Supabase Edge Function which proxies to Gemini 2.0 Flash.
+// Falls back to mock generators if the edge function is unavailable.
 
 import type {
   GeneratorConfig,
@@ -27,18 +16,13 @@ import type {
 import { EXAM_DATA, getSeedQuestions, getSeedFlashcards, getSeedStudyGuide, getSeedStudyPlan, getSeedVignettes } from '@/data/exam-prep-data';
 import { getRelevantKBEntries, formatKBForPrompt } from '@/lib/kb-retrieval';
 import { logGeneration } from '@/lib/audit-log';
-
-// Simulated delay for realistic UX
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+import { supabase } from '@/integrations/supabase/client';
 
 function generateId(): string {
   return `gen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 // ─── System Prompt Builder ──────────────────────────────────────────────
-// This builds the system context for AI generation calls.
 
 export function buildSystemPrompt(config: GeneratorConfig, kbContext?: string): string {
   const exam = EXAM_DATA[config.licenseType];
@@ -48,12 +32,11 @@ export function buildSystemPrompt(config: GeneratorConfig, kbContext?: string): 
 CONTEXT:
 - Exam: ${exam.title} (${exam.id})
 - Topic: ${config.topic}
-- Difficulty: ${config.difficulty}
 - California-specific emphasis: ${config.californiaEmphasis ? 'Yes' : 'No'}
-- Beginner review mode: ${config.isBeginnerReview ? 'Yes' : 'No'}
 
 GUIDELINES:
-- Generate content that is clinically accurate and relevant to California licensing exams.
+- Generate exam-level content that is clinically accurate and relevant to California licensing exams.
+- All content should match the difficulty and complexity candidates will encounter on the actual exam.
 - Use plain professional language—not overly academic, not patronizing.
 - Be specific to the selected license context.
 - Include California-specific laws, codes, and regulations when relevant.
@@ -71,11 +54,10 @@ CLINICAL VIGNETTE INSTRUCTIONS:
 - Create a realistic, paragraph-length client presentation with demographics, presenting problem, and relevant history.
 - Follow each vignette with 4-6 questions testing different competency areas (diagnosis, treatment planning, ethics, risk assessment, cultural competence).
 - Each question should have 4 answer choices with detailed rationales for correct and incorrect answers.
-- Difficulty scaling: beginner = straightforward cases, intermediate = some complexity, exam_level = nuanced cases with competing clinical priorities.
+- Present nuanced cases with competing clinical priorities, reflecting actual exam complexity.
 - Ensure vignettes reflect diverse client populations and clinical settings.`;
   }
 
-  // Inject KB context if available
   if (kbContext) {
     prompt += kbContext;
   }
@@ -83,63 +65,143 @@ CLINICAL VIGNETTE INSTRUCTIONS:
   return prompt;
 }
 
-// ─── Mock Generator Functions ───────────────────────────────────────────
-// Each function returns realistic mock content. Replace internals with
-// Gemini API calls for production.
+// ─── User Prompt Builder ────────────────────────────────────────────────
 
-async function generatePracticeQuestions(config: GeneratorConfig): Promise<PracticeQuestion[]> {
-  // TODO: GEMINI API CALL
-  // const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
-  // const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-  // const prompt = buildSystemPrompt(config) + `\n\nGenerate ${config.itemCount} practice questions...`;
-  // const result = await model.generateContent(prompt);
-  // Parse and return structured questions
+function buildUserPrompt(config: GeneratorConfig): string {
+  const exam = EXAM_DATA[config.licenseType];
+  const formatLabel = config.studyFormat.replace(/_/g, ' ');
+  const itemCount = config.itemCount;
 
+  const base = `Generate ${formatLabel} for the ${exam.shortTitle} exam on the topic: "${config.topic}".
+All content should be at exam-level difficulty.`;
+
+  switch (config.studyFormat) {
+    case 'practice_questions':
+      return `${base}
+Generate exactly ${itemCount} multiple-choice questions. Each question must have exactly 4 answer choices (A, B, C, D).
+Include detailed rationale for the correct answer and explanations for why each incorrect answer is wrong.
+Assign each question a unique id starting with "gen-".`;
+
+    case 'clinical_vignette':
+      return `${base}
+Generate exactly ${itemCount} clinical vignettes. Each vignette must include:
+- A realistic paragraph-length client presentation
+- Client demographics
+- Presenting problem
+- Relevant history
+- 4-6 follow-up questions testing different competency areas (diagnosis, treatment planning, ethics, risk assessment, cultural competence)
+Each question should have 4 choices with detailed rationales.
+Assign each vignette and question a unique id starting with "gen-".`;
+
+    case 'flashcards':
+      return `${base}
+Generate exactly ${itemCount} flashcards. Each flashcard should have a clear question or term on the front and a concise, accurate answer on the back.
+Assign each flashcard a category based on the content area and a unique id starting with "gen-".`;
+
+    case 'study_guide':
+      return `${base}
+Generate a comprehensive study guide with 3-5 sections. Each section should include:
+- A clear overview paragraph
+- 3-5 key terms with definitions
+- 3-5 practical takeaways for exam preparation
+- 2-4 common exam traps to avoid
+- 2-3 memory aids or mnemonics
+Assign unique ids starting with "gen-" to the guide and each section.`;
+
+    case 'quick_reference':
+      return `${base}
+Generate a quick reference sheet with 6-8 items. Each item should have a heading and concise content covering key definitions, California law references, clinical applications, exam tips, common mistakes, and memory aids.
+Assign a unique id starting with "gen-".`;
+
+    default:
+      return `${base}\nGenerate ${itemCount} items. Assign each a unique id starting with "gen-".`;
+  }
+}
+
+// ─── Edge Function Call ─────────────────────────────────────────────────
+
+async function callGeminiEdgeFunction(
+  systemPrompt: string,
+  config: GeneratorConfig,
+): Promise<{ data: unknown; model: string }> {
+  const userPrompt = buildUserPrompt(config);
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error('Not authenticated');
+  }
+
+  const res = await fetch(
+    `${import.meta.env.VITE_SUPABASE_URL || 'https://axcwegrylfnadgbzgqnv.supabase.co'}/functions/v1/generate`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4Y3dlZ3J5bGZuYWRnYnpncW52Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MTk1NjQsImV4cCI6MjA4OTQ5NTU2NH0.ssSoyXjKpN8jcorVi2_suqRCSS_hs6nRqNVJnBUj6_Y',
+      },
+      body: JSON.stringify({
+        systemPrompt,
+        userPrompt,
+        studyFormat: config.studyFormat,
+        config: {
+          licenseType: config.licenseType,
+          topic: config.topic,
+          difficulty: config.difficulty,
+          itemCount: config.itemCount,
+          includeRationales: config.includeRationales,
+          californiaEmphasis: config.californiaEmphasis,
+          isBeginnerReview: config.isBeginnerReview,
+        },
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: 'Unknown error' }));
+    if (body.limitReached) {
+      throw new Error(body.message || 'Daily generation limit reached');
+    }
+    throw new Error(body.error || `Edge function returned ${res.status}`);
+  }
+
+  return await res.json();
+}
+
+// ─── Mock Fallback Generators ───────────────────────────────────────────
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function mockPracticeQuestions(config: GeneratorConfig): Promise<PracticeQuestion[]> {
   await delay(1500 + Math.random() * 1000);
   const seed = getSeedQuestions(config.licenseType);
   const questions: PracticeQuestion[] = [];
-
   for (let i = 0; i < config.itemCount; i++) {
     const base = seed[i % seed.length];
-    questions.push({
-      ...base,
-      id: generateId(),
-      topic: config.topic || base.topic,
-      difficulty: config.difficulty,
-    });
+    questions.push({ ...base, id: generateId(), topic: config.topic || base.topic, difficulty: config.difficulty });
   }
   return questions;
 }
 
-async function generateFlashcards(config: GeneratorConfig): Promise<Flashcard[]> {
-  // TODO: GEMINI API CALL — see generatePracticeQuestions for pattern
+async function mockFlashcards(config: GeneratorConfig): Promise<Flashcard[]> {
   await delay(1200 + Math.random() * 800);
   const seed = getSeedFlashcards(config.licenseType);
   const cards: Flashcard[] = [];
   for (let i = 0; i < config.itemCount; i++) {
     const base = seed[i % seed.length];
-    cards.push({
-      ...base,
-      id: generateId(),
-      topic: config.topic || base.topic,
-    });
+    cards.push({ ...base, id: generateId(), topic: config.topic || base.topic });
   }
   return cards;
 }
 
-async function generateStudyGuide(config: GeneratorConfig): Promise<StudyGuide> {
-  // TODO: GEMINI API CALL
+async function mockStudyGuide(config: GeneratorConfig): Promise<StudyGuide> {
   await delay(2000 + Math.random() * 1000);
-  return {
-    ...getSeedStudyGuide(config.licenseType),
-    id: generateId(),
-    title: `${config.topic || 'Study Guide'} — ${EXAM_DATA[config.licenseType].shortTitle}`,
-    topic: config.topic,
-  };
+  return { ...getSeedStudyGuide(config.licenseType), id: generateId(), title: `${config.topic || 'Study Guide'} — ${EXAM_DATA[config.licenseType].shortTitle}`, topic: config.topic };
 }
 
-async function generateQuickReference(config: GeneratorConfig): Promise<QuickReference> {
-  // TODO: GEMINI API CALL
+async function mockQuickReference(config: GeneratorConfig): Promise<QuickReference> {
   await delay(1000 + Math.random() * 500);
   return {
     id: generateId(),
@@ -147,34 +209,41 @@ async function generateQuickReference(config: GeneratorConfig): Promise<QuickRef
     topic: config.topic,
     items: [
       { heading: 'Key Definition', content: `${config.topic} refers to the core principles and regulations governing this area of clinical practice in California.` },
-      { heading: 'California Law', content: 'Clinicians must comply with relevant sections of the California Business and Professions Code and associated regulations. Verify specific code sections with official BBS resources.' },
-      { heading: 'Clinical Application', content: 'In practice, this topic frequently appears in scenarios involving client safety, ethical decision-making, and professional boundaries.' },
-      { heading: 'Exam Tip', content: 'Questions on this topic often test your ability to apply the law to a specific clinical scenario, not just recall the rule. Focus on the reasoning process.' },
-      { heading: 'Common Mistakes', content: 'Test-takers often confuse similar concepts or apply rules from other states. Always think "California-specific" when answering.' },
-      { heading: 'Memory Aid', content: 'Create a mnemonic or visual association that links the key rule to a concrete clinical example you can remember under test pressure.' },
+      { heading: 'California Law', content: 'Clinicians must comply with relevant sections of the California Business and Professions Code and associated regulations.' },
+      { heading: 'Clinical Application', content: 'This topic frequently appears in scenarios involving client safety, ethical decision-making, and professional boundaries.' },
+      { heading: 'Exam Tip', content: 'Questions on this topic often test your ability to apply the law to a specific clinical scenario.' },
+      { heading: 'Common Mistakes', content: 'Test-takers often confuse similar concepts or apply rules from other states.' },
+      { heading: 'Memory Aid', content: 'Create a mnemonic or visual association that links the key rule to a concrete clinical example.' },
     ],
   };
 }
 
-async function generateStudyPlan(config: GeneratorConfig): Promise<StudyPlan> {
-  // TODO: GEMINI API CALL
-  await delay(1800 + Math.random() * 700);
-  return getSeedStudyPlan(config.licenseType, config.topic ? [config.topic] : []);
-}
-
-async function generateClinicalVignettes(config: GeneratorConfig): Promise<ClinicalVignette[]> {
-  // TODO: GEMINI API CALL — replace mock with Gemini when ready
+async function mockVignettes(config: GeneratorConfig): Promise<ClinicalVignette[]> {
   await delay(2000 + Math.random() * 1000);
   const seed = getSeedVignettes(config.licenseType);
   const vignettes: ClinicalVignette[] = [];
   for (let i = 0; i < config.itemCount; i++) {
     const base = seed[i % seed.length];
-    vignettes.push({
-      ...base,
-      id: generateId(),
-    });
+    vignettes.push({ ...base, id: generateId() });
   }
   return vignettes;
+}
+
+async function generateMockContent(config: GeneratorConfig): Promise<GeneratedContent> {
+  switch (config.studyFormat) {
+    case 'practice_questions':
+      return { type: 'practice_questions', data: await mockPracticeQuestions(config) };
+    case 'clinical_vignette':
+      return { type: 'clinical_vignette', data: await mockVignettes(config) };
+    case 'flashcards':
+      return { type: 'flashcards', data: await mockFlashcards(config) };
+    case 'study_guide':
+      return { type: 'study_guide', data: await mockStudyGuide(config) };
+    case 'quick_reference':
+      return { type: 'quick_reference', data: await mockQuickReference(config) };
+    default:
+      return { type: 'practice_questions', data: await mockPracticeQuestions(config) };
+  }
 }
 
 // ─── Main Generation Entry Point ────────────────────────────────────────
@@ -182,6 +251,7 @@ async function generateClinicalVignettes(config: GeneratorConfig): Promise<Clini
 export interface GenerationResult {
   content: GeneratedContent;
   auditEntryId: string | null;
+  model: string;
 }
 
 export async function generateStudyMaterial(
@@ -209,42 +279,23 @@ export async function generateStudyMaterial(
   const systemPrompt = buildSystemPrompt(config, kbContext);
 
   let content: GeneratedContent;
-  switch (config.studyFormat) {
-    case 'practice_questions':
-      content = { type: 'practice_questions', data: await generatePracticeQuestions(config) };
-      break;
-    case 'scenario_questions':
-      content = { type: 'scenario_questions', data: await generatePracticeQuestions({ ...config, customPrompt: 'scenario-based' }) };
-      break;
-    case 'clinical_vignette':
-      content = { type: 'clinical_vignette', data: await generateClinicalVignettes(config) };
-      break;
-    case 'flashcards':
-      content = { type: 'flashcards', data: await generateFlashcards(config) };
-      break;
-    case 'study_guide':
-      content = { type: 'study_guide', data: await generateStudyGuide(config) };
-      break;
-    case 'quick_reference':
-      content = { type: 'quick_reference', data: await generateQuickReference(config) };
-      break;
-    case 'mini_quiz':
-      content = { type: 'mini_quiz', data: await generatePracticeQuestions({ ...config, itemCount: Math.min(config.itemCount, 10) }) };
-      break;
-    case 'mock_exam':
-      content = { type: 'mock_exam', data: await generatePracticeQuestions({ ...config, itemCount: 25 }) };
-      break;
-    case 'law_ethics_spotter':
-      content = { type: 'law_ethics_spotter', data: await generatePracticeQuestions({ ...config, customPrompt: 'law-ethics-spotter' }) };
-      break;
-    case 'rationale_review':
-      content = { type: 'rationale_review', data: await generatePracticeQuestions(config) };
-      break;
-    case 'study_plan':
-      content = { type: 'study_plan', data: await generateStudyPlan(config) };
-      break;
-    default:
-      content = { type: 'practice_questions', data: await generatePracticeQuestions(config) };
+  let modelUsed = 'mock-generator';
+
+  // Try Gemini edge function first, fall back to mock if unavailable
+  try {
+    const result = await callGeminiEdgeFunction(systemPrompt, config);
+    modelUsed = result.model || 'gemini-2.0-flash';
+
+    // Wrap the raw data in the GeneratedContent envelope
+    content = { type: config.studyFormat, data: result.data } as GeneratedContent;
+  } catch (err: any) {
+    // If it's a usage limit error, re-throw so the UI can show it
+    if (err.message?.includes('limit')) {
+      throw err;
+    }
+
+    console.warn('Gemini edge function unavailable, falling back to mock:', err.message);
+    content = await generateMockContent(config);
   }
 
   const generationTimeMs = Date.now() - startTime;
@@ -257,12 +308,12 @@ export async function generateStudyMaterial(
         userId,
         systemPrompt,
         promptText: `Format: ${config.studyFormat}, Topic: ${config.topic}, Difficulty: ${config.difficulty}, Items: ${config.itemCount}`,
-        outputText: JSON.stringify(content.data).slice(0, 10000), // Cap at 10k chars
+        outputText: JSON.stringify(content.data).slice(0, 10000),
         licenseType: config.licenseType,
         studyFormat: config.studyFormat,
         topic: config.topic,
         difficulty: config.difficulty,
-        modelUsed: 'mock-generator',
+        modelUsed,
         generationTimeMs,
         kbEntriesUsed: kbEntryIds,
       });
@@ -271,7 +322,7 @@ export async function generateStudyMaterial(
     }
   }
 
-  return { content, auditEntryId };
+  return { content, auditEntryId, model: modelUsed };
 }
 
 // ─── Weak Area Assessment Generator ─────────────────────────────────────
@@ -280,7 +331,6 @@ export async function generateWeakAreaPlan(
   license: LicenseType,
   weakAreas: string[]
 ): Promise<StudyPlan> {
-  // TODO: GEMINI API CALL for truly personalized plan
   await delay(2000);
   return getSeedStudyPlan(license, weakAreas);
 }
