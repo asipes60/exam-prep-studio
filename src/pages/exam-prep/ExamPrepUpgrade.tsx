@@ -40,7 +40,7 @@ export default function ExamPrepUpgrade() {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'biannual'>('biannual');
   const [loading, setLoading] = useState(false);
 
   const isPro = user?.subscriptionStatus === 'pro';
@@ -68,7 +68,7 @@ export default function ExamPrepUpgrade() {
       // Use env var for price IDs, fallback to placeholders
       const priceId = billingCycle === 'monthly'
         ? (import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID || 'MONTHLY_PRICE_ID_NOT_SET')
-        : (import.meta.env.VITE_STRIPE_YEARLY_PRICE_ID || 'YEARLY_PRICE_ID_NOT_SET');
+        : (import.meta.env.VITE_STRIPE_BIANNUAL_PRICE_ID || 'BIANNUAL_PRICE_ID_NOT_SET');
 
       const res = await fetch(`${SUPABASE_URL}/functions/v1/checkout`, {
         method: 'POST',
@@ -182,14 +182,14 @@ export default function ExamPrepUpgrade() {
             </button>
             <button
               className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
-                billingCycle === 'yearly'
+                billingCycle === 'biannual'
                   ? 'bg-blue-100 text-blue-700'
                   : 'text-slate-500 hover:text-slate-700'
               }`}
-              onClick={() => setBillingCycle('yearly')}
+              onClick={() => setBillingCycle('biannual')}
             >
-              Yearly
-              <Badge className="ml-2 bg-emerald-100 text-emerald-700 text-xs">Save 30%</Badge>
+              6 Months
+              <Badge className="ml-2 bg-emerald-100 text-emerald-700 text-xs">Save 17%</Badge>
             </button>
           </div>
 
@@ -236,15 +236,15 @@ export default function ExamPrepUpgrade() {
                   Pro <Zap className="w-4 h-4 text-amber-500" />
                 </h3>
                 <p className="text-3xl font-bold text-slate-900 mb-1">
-                  {billingCycle === 'monthly' ? '$24' : '$199'}
+                  {billingCycle === 'monthly' ? '$24' : '$119'}
                   <span className="text-sm font-normal text-slate-400">
-                    /{billingCycle === 'monthly' ? 'month' : 'year'}
+                    /{billingCycle === 'monthly' ? 'month' : '6 months'}
                   </span>
                 </p>
                 <p className="text-xs text-slate-400 mb-6">
-                  {billingCycle === 'yearly'
-                    ? 'That\'s ~$16.58/month — save $89/year'
-                    : 'Or $199/year and save 30%'}
+                  {billingCycle === 'biannual'
+                    ? 'That\'s ~$19.83/month — save $25 vs monthly'
+                    : 'Or $119 for 6 months and save 17%'}
                 </p>
 
                 <ul className="space-y-3">
