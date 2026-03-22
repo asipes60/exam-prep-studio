@@ -75,6 +75,13 @@ export default function ExamPrepNav() {
         <div className="hidden md:flex items-center gap-2">
           {isAuthenticated ? (
             <>
+              {user?.subscriptionStatus !== 'pro' && (
+                <Link to="/upgrade">
+                  <Button size="sm" variant="outline" className="text-amber-600 border-amber-300 hover:bg-amber-50 text-xs">
+                    Upgrade
+                  </Button>
+                </Link>
+              )}
               <span className="text-sm text-slate-500 flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5" />
                 {user?.name}

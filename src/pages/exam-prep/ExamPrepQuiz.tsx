@@ -419,7 +419,10 @@ export default function ExamPrepQuiz() {
                 </Select>
                 {!isPro && (
                   <p className="text-xs text-slate-400 mt-1">
-                    Upgrade to Pro for 25, 50, or 75 question quizzes.
+                    <a href="/upgrade" className="text-blue-600 hover:underline">
+                      Upgrade to Pro
+                    </a>{' '}
+                    for 25, 50, or 75 question quizzes.
                   </p>
                 )}
               </div>
