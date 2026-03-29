@@ -172,8 +172,9 @@ Assign a unique id starting with "gen-".`;
 async function callGeminiEdgeFunction(
   systemPrompt: string,
   config: GeneratorConfig,
+  options?: { userPromptOverride?: string; timeoutMs?: number },
 ): Promise<{ data: unknown; model: string }> {
-  const userPrompt = buildUserPrompt(config);
+  const userPrompt = options?.userPromptOverride ?? buildUserPrompt(config);
 
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) {
@@ -204,6 +205,7 @@ async function callGeminiEdgeFunction(
         },
       }),
     },
+    { timeoutMs: options?.timeoutMs },
   );
 
   if (!res.ok) {
@@ -494,43 +496,10 @@ Generate a structured 6-8 week plan with weekly focus topics, recommended materi
       isBeginnerReview: false,
     };
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) {
-      throw new Error('Not authenticated');
-    }
-
-    const res = await fetchWithRetry(
-      `${supabaseUrl}/functions/v1/generate`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': supabaseAnonKey,
-        },
-        body: JSON.stringify({
-          systemPrompt,
-          userPrompt,
-          studyFormat: 'study_plan',
-          config: {
-            licenseType: license,
-            topic: weakAreas.join(', ') || 'General Review',
-            difficulty: 'exam_level',
-            itemCount: 1,
-            includeRationales: false,
-            californiaEmphasis: true,
-            isBeginnerReview: false,
-          },
-        }),
-      },
-      { timeoutMs: 45_000 }, // study plans take longer to generate
-    );
-
-    if (!res.ok) {
-      throw new Error(`Edge function returned ${res.status}`);
-    }
-
-    const result = await res.json();
+    const result = await callGeminiEdgeFunction(systemPrompt, config, {
+      userPromptOverride: userPrompt,
+      timeoutMs: 45_000, // study plans take longer to generate
+    });
     const plan = validateStudyPlan(result.data) as StudyPlan;
 
     // Ensure required fields

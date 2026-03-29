@@ -450,38 +450,18 @@ export async function saveDomainScores(
   licenseType: LicenseType,
   scores: { domainId: string; domainName: string; correct: number; total: number }[],
 ): Promise<void> {
-  // Upsert each domain score — accumulate totals
+  // Atomic upsert via RPC — prevents race conditions from concurrent quiz completions
   for (const score of scores) {
-    // Try to read existing first
-    const { data: existing } = await supabase
-      .from('exam_prep_domain_scores')
-      .select('total_questions, correct_answers')
-      .eq('user_id', userId)
-      .eq('license_type', licenseType)
-      .eq('domain_id', score.domainId)
-      .single();
-
-    if (existing) {
-      await supabase
-        .from('exam_prep_domain_scores')
-        .update({
-          total_questions: existing.total_questions + score.total,
-          correct_answers: existing.correct_answers + score.correct,
-          last_quiz_at: new Date().toISOString(),
-        })
-        .eq('user_id', userId)
-        .eq('license_type', licenseType)
-        .eq('domain_id', score.domainId);
-    } else {
-      await supabase.from('exam_prep_domain_scores').insert({
-        user_id: userId,
-        license_type: licenseType,
-        domain_id: score.domainId,
-        domain_name: score.domainName,
-        total_questions: score.total,
-        correct_answers: score.correct,
-        last_quiz_at: new Date().toISOString(),
-      });
+    const { error } = await supabase.rpc('upsert_domain_score', {
+      p_user_id: userId,
+      p_license_type: licenseType,
+      p_domain_id: score.domainId,
+      p_domain_name: score.domainName,
+      p_correct: score.correct,
+      p_total: score.total,
+    });
+    if (error) {
+      console.warn('Failed to upsert domain score:', error);
     }
   }
 }

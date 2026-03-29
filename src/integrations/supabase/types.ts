@@ -486,7 +486,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      upsert_domain_score: {
+        Args: {
+          p_correct: number
+          p_domain_id: string
+          p_domain_name: string
+          p_license_type: string
+          p_total: number
+          p_user_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
