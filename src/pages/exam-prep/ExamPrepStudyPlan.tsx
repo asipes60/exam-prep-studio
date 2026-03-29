@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/use-auth';
 import { useExamPrep } from '@/contexts/ExamPrepContext';
@@ -28,9 +28,11 @@ export default function ExamPrepStudyPlan() {
   const [toggling, setToggling] = useState<number | null>(null);
 
   // Sync completed weeks when activePlan changes
-  if (activePlan && completedWeeks !== activePlan.completedWeeks && !toggling) {
-    setCompletedWeeks(activePlan.completedWeeks);
-  }
+  useEffect(() => {
+    if (activePlan && !toggling) {
+      setCompletedWeeks(activePlan.completedWeeks);
+    }
+  }, [activePlan?.completedWeeks, toggling]);
 
   if (!isAuthenticated) {
     return (

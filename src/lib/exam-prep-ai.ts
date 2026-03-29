@@ -321,8 +321,8 @@ export async function generateStudyMaterial(
       kbContext = formatKBForPrompt(kbEntries);
       kbEntryIds = kbEntries.map((e) => e.id);
     }
-  } catch {
-    // KB retrieval is non-critical; continue without it
+  } catch (err) {
+    console.warn('KB retrieval failed (non-critical):', err);
   }
 
   const systemPrompt = buildSystemPrompt(config, kbContext);
@@ -367,8 +367,8 @@ export async function generateStudyMaterial(
         generationTimeMs,
         kbEntriesUsed: kbEntryIds,
       });
-    } catch {
-      // Audit logging is non-critical; continue
+    } catch (err) {
+      console.warn('Audit logging failed (non-critical):', err);
     }
   }
 
