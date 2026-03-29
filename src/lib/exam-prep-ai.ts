@@ -16,7 +16,7 @@ import type {
 import { EXAM_DATA, getSeedQuestions, getSeedFlashcards, getSeedStudyGuide, getSeedStudyPlan, getSeedVignettes } from '@/data/exam-prep-data';
 import { getRelevantKBEntries, formatKBForPrompt } from '@/lib/kb-retrieval';
 import { logGeneration } from '@/lib/audit-log';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, supabaseUrl, supabaseAnonKey } from '@/integrations/supabase/client';
 
 function generateId(): string {
   return `gen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -135,13 +135,13 @@ async function callGeminiEdgeFunction(
   }
 
   const res = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL || 'https://axcwegrylfnadgbzgqnv.supabase.co'}/functions/v1/generate`,
+    `${supabaseUrl}/functions/v1/generate`,
     {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.access_token}`,
-        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4Y3dlZ3J5bGZuYWRnYnpncW52Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MTk1NjQsImV4cCI6MjA4OTQ5NTU2NH0.ssSoyXjKpN8jcorVi2_suqRCSS_hs6nRqNVJnBUj6_Y',
+        'apikey': supabaseAnonKey,
       },
       body: JSON.stringify({
         systemPrompt,
@@ -291,13 +291,13 @@ export async function generateStudyMaterial(
 
     // Wrap the raw data in the GeneratedContent envelope
     content = { type: config.studyFormat, data: result.data } as GeneratedContent;
-  } catch (err: any) {
+  } catch (err: unknown) {
     // If it's a usage limit error, re-throw so the UI can show it
-    if (err.message?.includes('limit')) {
+    if (err instanceof Error && err.message?.includes('limit')) {
       throw err;
     }
 
-    console.warn('Gemini edge function unavailable, falling back to mock:', err.message);
+    console.warn('Gemini edge function unavailable, falling back to mock:', err instanceof Error ? err.message : err);
     content = await generateMockContent(config);
   }
 
@@ -453,13 +453,13 @@ Generate a structured 6-8 week plan with weekly focus topics, recommended materi
     }
 
     const res = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL || 'https://axcwegrylfnadgbzgqnv.supabase.co'}/functions/v1/generate`,
+      `${supabaseUrl}/functions/v1/generate`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4Y3dlZ3J5bGZuYWRnYnpncW52Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MTk1NjQsImV4cCI6MjA4OTQ5NTU2NH0.ssSoyXjKpN8jcorVi2_suqRCSS_hs6nRqNVJnBUj6_Y',
+          'apikey': supabaseAnonKey,
         },
         body: JSON.stringify({
           systemPrompt,

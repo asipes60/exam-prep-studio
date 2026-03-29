@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import type {
   LicenseType,
   StudyFormat,
@@ -142,9 +142,9 @@ export function ExamPrepProvider({ children }: { children: React.ReactNode }) {
       const result = await generateStudyMaterial(config, user?.id);
       setGeneratedContent(result.content);
       setLatestAuditEntryId(result.auditEntryId);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Generation failed:', err);
-      toast.error(err.message || 'Generation failed. Please try again.');
+      toast.error(err instanceof Error ? err.message : 'Generation failed. Please try again.');
     } finally {
       setIsGenerating(false);
     }
@@ -215,37 +215,60 @@ export function ExamPrepProvider({ children }: { children: React.ReactNode }) {
     storage.getFoldersAsync().then(setFolders).catch(() => {});
   }, []);
 
+  const value = useMemo<ExamPrepState>(() => ({
+    selectedLicense,
+    setSelectedLicense,
+    generatorConfig,
+    updateGeneratorConfig,
+    generatedContent,
+    isGenerating,
+    generateContent,
+    latestAuditEntryId,
+    pendingConfig,
+    setPendingConfig,
+    activePlan,
+    loadActivePlan,
+    planLoading,
+    weakAreas,
+    savedMaterials,
+    folders,
+    saveMaterial: handleSaveMaterial,
+    deleteMaterial: handleDeleteMaterial,
+    toggleFavorite: handleToggleFavorite,
+    createFolder: handleCreateFolder,
+    deleteFolder: handleDeleteFolder,
+    refreshSavedMaterials,
+    activeQuiz,
+    setActiveQuiz,
+    studyMode,
+    setStudyMode,
+  }), [
+    selectedLicense,
+    generatorConfig,
+    generatedContent,
+    isGenerating,
+    generateContent,
+    latestAuditEntryId,
+    pendingConfig,
+    activePlan,
+    loadActivePlan,
+    planLoading,
+    weakAreas,
+    savedMaterials,
+    folders,
+    handleSaveMaterial,
+    handleDeleteMaterial,
+    handleToggleFavorite,
+    handleCreateFolder,
+    handleDeleteFolder,
+    refreshSavedMaterials,
+    activeQuiz,
+    studyMode,
+    updateGeneratorConfig,
+  ]);
+
   return (
-    <ExamPrepContext.Provider
-      value={{
-        selectedLicense,
-        setSelectedLicense,
-        generatorConfig,
-        updateGeneratorConfig,
-        generatedContent,
-        isGenerating,
-        generateContent,
-        latestAuditEntryId,
-        pendingConfig,
-        setPendingConfig,
-        activePlan,
-        loadActivePlan,
-        planLoading,
-        weakAreas,
-        savedMaterials,
-        folders,
-        saveMaterial: handleSaveMaterial,
-        deleteMaterial: handleDeleteMaterial,
-        toggleFavorite: handleToggleFavorite,
-        createFolder: handleCreateFolder,
-        deleteFolder: handleDeleteFolder,
-        refreshSavedMaterials,
-        activeQuiz,
-        setActiveQuiz,
-        studyMode,
-        setStudyMode,
-      }}
-    >
+    <ExamPrepContext.Provider value={value}>
       {children}
     </ExamPrepContext.Provider>
   );

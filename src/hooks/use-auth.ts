@@ -39,11 +39,13 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 async function fetchProfile(userId: string): Promise<UserProfile | null> {
   const { data, error } = await withTimeout(
-    supabase
-      .from('profiles')
-      .select('id, email, name, preferred_license, subscription_status, daily_generations, daily_generations_reset_at, is_admin')
-      .eq('id', userId)
-      .single(),
+    Promise.resolve(
+      supabase
+        .from('profiles')
+        .select('id, email, name, preferred_license, subscription_status, daily_generations, daily_generations_reset_at, is_admin')
+        .eq('id', userId)
+        .single()
+    ),
     8000,
     'Profile fetch'
   );
@@ -52,13 +54,13 @@ async function fetchProfile(userId: string): Promise<UserProfile | null> {
 
   return {
     id: data.id,
-    email: data.email,
-    name: data.name,
+    email: data.email ?? '',
+    name: data.name ?? '',
     preferredLicense: data.preferred_license,
     subscriptionStatus: data.subscription_status as 'free' | 'pro' | 'cancelled',
     dailyGenerations: data.daily_generations,
     dailyGenerationsResetAt: data.daily_generations_reset_at,
-    isAdmin: (data as any).is_admin ?? false,
+    isAdmin: data.is_admin ?? false,
   };
 }
 
