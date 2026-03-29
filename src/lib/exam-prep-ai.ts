@@ -17,9 +17,55 @@ import { EXAM_DATA, getSeedQuestions, getSeedFlashcards, getSeedStudyGuide, getS
 import { getRelevantKBEntries, formatKBForPrompt } from '@/lib/kb-retrieval';
 import { logGeneration } from '@/lib/audit-log';
 import { supabase, supabaseUrl, supabaseAnonKey } from '@/integrations/supabase/client';
+import { validateAIResponse, validateStudyPlan } from '@/lib/validation';
 
 function generateId(): string {
   return `gen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// ─── Fetch with Timeout + Retry ─────────────────────────────────────────
+
+const EDGE_FN_TIMEOUT_MS = 30_000; // 30 seconds
+const MAX_RETRIES = 2; // up to 3 total attempts
+const BASE_DELAY_MS = 1_000; // 1s, doubles each retry
+
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  { timeoutMs = EDGE_FN_TIMEOUT_MS, maxRetries = MAX_RETRIES }: { timeoutMs?: number; maxRetries?: number } = {},
+): Promise<Response> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timer);
+
+      // Don't retry client errors (4xx) — only server errors (5xx) or network failures
+      if (res.ok || (res.status >= 400 && res.status < 500)) {
+        return res;
+      }
+
+      lastError = new Error(`Edge function returned ${res.status}`);
+    } catch (err) {
+      clearTimeout(timer);
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        lastError = new Error(`Request timed out after ${timeoutMs / 1000}s`);
+      } else {
+        lastError = err instanceof Error ? err : new Error('Network request failed');
+      }
+    }
+
+    // Exponential backoff before next retry
+    if (attempt < maxRetries) {
+      await new Promise((resolve) => setTimeout(resolve, BASE_DELAY_MS * 2 ** attempt));
+    }
+  }
+
+  throw lastError ?? new Error('Edge function request failed');
 }
 
 // ─── System Prompt Builder ──────────────────────────────────────────────
@@ -134,7 +180,7 @@ async function callGeminiEdgeFunction(
     throw new Error('Not authenticated');
   }
 
-  const res = await fetch(
+  const res = await fetchWithRetry(
     `${supabaseUrl}/functions/v1/generate`,
     {
       method: 'POST',
@@ -157,7 +203,7 @@ async function callGeminiEdgeFunction(
           isBeginnerReview: config.isBeginnerReview,
         },
       }),
-    }
+    },
   );
 
   if (!res.ok) {
@@ -289,8 +335,9 @@ export async function generateStudyMaterial(
     const result = await callGeminiEdgeFunction(systemPrompt, config);
     modelUsed = result.model || 'gemini-2.0-flash';
 
-    // Wrap the raw data in the GeneratedContent envelope
-    content = { type: config.studyFormat, data: result.data } as GeneratedContent;
+    // Validate and wrap the raw data in the GeneratedContent envelope
+    const validatedData = validateAIResponse(config.studyFormat, result.data);
+    content = { type: config.studyFormat, data: validatedData } as GeneratedContent;
   } catch (err: unknown) {
     // If it's a usage limit error, re-throw so the UI can show it
     if (err instanceof Error && err.message?.includes('limit')) {
@@ -452,7 +499,7 @@ Generate a structured 6-8 week plan with weekly focus topics, recommended materi
       throw new Error('Not authenticated');
     }
 
-    const res = await fetch(
+    const res = await fetchWithRetry(
       `${supabaseUrl}/functions/v1/generate`,
       {
         method: 'POST',
@@ -476,6 +523,7 @@ Generate a structured 6-8 week plan with weekly focus topics, recommended materi
           },
         }),
       },
+      { timeoutMs: 45_000 }, // study plans take longer to generate
     );
 
     if (!res.ok) {
@@ -483,7 +531,7 @@ Generate a structured 6-8 week plan with weekly focus topics, recommended materi
     }
 
     const result = await res.json();
-    const plan = result.data as StudyPlan;
+    const plan = validateStudyPlan(result.data) as StudyPlan;
 
     // Ensure required fields
     return {
