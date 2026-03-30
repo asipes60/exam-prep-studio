@@ -3,6 +3,7 @@
 // for non-authenticated features (quiz sessions, assessments, recent config).
 
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import type {
   SavedMaterial,
   Folder,
@@ -84,7 +85,7 @@ export async function saveMaterialAsync(material: SavedMaterial): Promise<void> 
     license_type: material.licenseType,
     study_format: material.studyFormat,
     topic: material.topic,
-    content: material.content as unknown as Record<string, unknown>,
+    content: material.content as unknown as Json,
     is_favorite: material.isFavorite,
     folder_id: material.folderId ?? null,
     tags: material.tags,
@@ -95,21 +96,29 @@ export async function saveMaterialAsync(material: SavedMaterial): Promise<void> 
 }
 
 export async function deleteMaterialAsync(id: string): Promise<void> {
-  await supabase.from('exam_prep_materials').delete().eq('id', id);
+  const userId = await getCurrentUserId();
+  if (!userId) return;
+
+  await supabase.from('exam_prep_materials').delete().eq('id', id).eq('user_id', userId);
 }
 
 export async function toggleFavoriteAsync(id: string): Promise<void> {
+  const userId = await getCurrentUserId();
+  if (!userId) return;
+
   const { data } = await supabase
     .from('exam_prep_materials')
     .select('is_favorite')
     .eq('id', id)
+    .eq('user_id', userId)
     .single();
 
   if (data) {
     await supabase
       .from('exam_prep_materials')
       .update({ is_favorite: !data.is_favorite })
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', userId);
   }
 }
 
@@ -164,9 +173,13 @@ export async function getFoldersAsync(): Promise<Folder[]> {
 
 export async function createFolderAsync(name: string): Promise<Folder> {
   const userId = await getCurrentUserId();
+  if (!userId) {
+    return { id: `folder-${Date.now()}`, name, createdAt: new Date().toISOString(), materialCount: 0 };
+  }
+
   const { data } = await supabase
     .from('exam_prep_folders')
-    .insert({ user_id: userId!, name })
+    .insert({ user_id: userId, name })
     .select()
     .single();
 
@@ -179,13 +192,17 @@ export async function createFolderAsync(name: string): Promise<Folder> {
 }
 
 export async function deleteFolderAsync(id: string): Promise<void> {
-  // Unassign materials from this folder first
+  const userId = await getCurrentUserId();
+  if (!userId) return;
+
+  // Unassign this user's materials from the folder first
   await supabase
     .from('exam_prep_materials')
     .update({ folder_id: null })
-    .eq('folder_id', id);
+    .eq('folder_id', id)
+    .eq('user_id', userId);
 
-  await supabase.from('exam_prep_folders').delete().eq('id', id);
+  await supabase.from('exam_prep_folders').delete().eq('id', id).eq('user_id', userId);
 }
 
 // Synchronous wrappers for compatibility
@@ -232,8 +249,8 @@ export async function saveQuizSessionAsync(
     mode: session.mode,
     format: session.format ?? 'practice_questions',
     topic: 'General Review',
-    questions: session.questions as unknown as Record<string, unknown>[],
-    results: session.results as unknown as Record<string, unknown>[],
+    questions: session.questions as unknown as Json,
+    results: session.results as unknown as Json,
     started_at: session.startedAt,
     completed_at: session.completedAt,
     score: session.score,
@@ -294,10 +311,10 @@ export async function saveAssessmentAsync(
     .insert({
       user_id: userId,
       license_type: licenseType,
-      ratings: result.ratings as unknown as Record<string, unknown>[],
+      ratings: result.ratings as unknown as Json,
       weak_areas: result.weakAreas,
       strong_areas: result.strongAreas,
-      suggested_plan: result.suggestedPlan as unknown as Record<string, unknown>,
+      suggested_plan: result.suggestedPlan as unknown as Json,
     })
     .select('id')
     .single();
@@ -353,14 +370,13 @@ export async function getLatestAssessmentAsync(
     .eq('user_id', userId)
     .not('suggested_plan', 'is', null)
     .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+    .limit(1);
 
   if (licenseType) {
     query = query.eq('license_type', licenseType);
   }
 
-  const { data, error } = await query;
+  const { data, error } = await query.single();
   if (error || !data) return null;
 
   return {
@@ -369,7 +385,7 @@ export async function getLatestAssessmentAsync(
     suggestedPlan: data.suggested_plan as unknown as StudyPlan | null,
     weakAreas: data.weak_areas ?? [],
     strongAreas: data.strong_areas ?? [],
-    completedWeeks: (data as any).completed_weeks ?? [],
+    completedWeeks: data.completed_weeks ?? [],
     createdAt: data.created_at,
   };
 }
@@ -385,7 +401,7 @@ export async function toggleWeekCompleted(
     .eq('id', assessmentId)
     .single();
 
-  const current: number[] = (data as any)?.completed_weeks ?? [];
+  const current: number[] = data?.completed_weeks ?? [];
   const updated = current.includes(weekNumber)
     ? current.filter((w) => w !== weekNumber)
     : [...current, weekNumber];
@@ -434,38 +450,18 @@ export async function saveDomainScores(
   licenseType: LicenseType,
   scores: { domainId: string; domainName: string; correct: number; total: number }[],
 ): Promise<void> {
-  // Upsert each domain score — accumulate totals
+  // Atomic upsert via RPC — prevents race conditions from concurrent quiz completions
   for (const score of scores) {
-    // Try to read existing first
-    const { data: existing } = await supabase
-      .from('exam_prep_domain_scores')
-      .select('total_questions, correct_answers')
-      .eq('user_id', userId)
-      .eq('license_type', licenseType)
-      .eq('domain_id', score.domainId)
-      .single();
-
-    if (existing) {
-      await supabase
-        .from('exam_prep_domain_scores')
-        .update({
-          total_questions: existing.total_questions + score.total,
-          correct_answers: existing.correct_answers + score.correct,
-          last_quiz_at: new Date().toISOString(),
-        })
-        .eq('user_id', userId)
-        .eq('license_type', licenseType)
-        .eq('domain_id', score.domainId);
-    } else {
-      await supabase.from('exam_prep_domain_scores').insert({
-        user_id: userId,
-        license_type: licenseType,
-        domain_id: score.domainId,
-        domain_name: score.domainName,
-        total_questions: score.total,
-        correct_answers: score.correct,
-        last_quiz_at: new Date().toISOString(),
-      });
+    const { error } = await supabase.rpc('upsert_domain_score', {
+      p_user_id: userId,
+      p_license_type: licenseType,
+      p_domain_id: score.domainId,
+      p_domain_name: score.domainName,
+      p_correct: score.correct,
+      p_total: score.total,
+    });
+    if (error) {
+      console.warn('Failed to upsert domain score:', error);
     }
   }
 }

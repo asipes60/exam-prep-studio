@@ -39,11 +39,13 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 async function fetchProfile(userId: string): Promise<UserProfile | null> {
   const { data, error } = await withTimeout(
-    supabase
-      .from('profiles')
-      .select('id, email, name, preferred_license, subscription_status, daily_generations, daily_generations_reset_at, is_admin')
-      .eq('id', userId)
-      .single(),
+    Promise.resolve(
+      supabase
+        .from('profiles')
+        .select('id, email, name, preferred_license, subscription_status, daily_generations, daily_generations_reset_at, is_admin')
+        .eq('id', userId)
+        .single()
+    ),
     8000,
     'Profile fetch'
   );
@@ -52,13 +54,13 @@ async function fetchProfile(userId: string): Promise<UserProfile | null> {
 
   return {
     id: data.id,
-    email: data.email,
-    name: data.name,
+    email: data.email ?? '',
+    name: data.name ?? '',
     preferredLicense: data.preferred_license,
     subscriptionStatus: data.subscription_status as 'free' | 'pro' | 'cancelled',
     dailyGenerations: data.daily_generations,
     dailyGenerationsResetAt: data.daily_generations_reset_at,
-    isAdmin: (data as any).is_admin ?? false,
+    isAdmin: data.is_admin ?? false,
   };
 }
 
@@ -77,7 +79,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           const profile = await fetchProfile(newSession.user.id);
           if (!cancelled) {
-            console.log('[Auth] Profile loaded:', profile?.email);
             setUser(profile);
           }
         } catch {
@@ -92,7 +93,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Subscribe first for real-time auth changes (SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
-        console.log('[Auth] Event:', event, newSession ? 'has session' : 'no session');
         handleSession(newSession);
       }
     );
@@ -100,7 +100,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Explicitly fetch session — the lock bypass can cause INITIAL_SESSION to fire
     // before the listener is attached, so we also read the session directly.
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      console.log('[Auth] getSession:', currentSession ? 'has session' : 'no session');
       handleSession(currentSession);
     }).catch(() => {
       if (!cancelled) setLoading(false);

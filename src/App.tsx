@@ -17,6 +17,7 @@ import ExamPrepAuth from "./pages/exam-prep/ExamPrepAuth";
 import ExamPrepDashboard from "./pages/exam-prep/ExamPrepDashboard";
 import ExamPrepStudyPlan from "./pages/exam-prep/ExamPrepStudyPlan";
 import ExamPrepUpgrade from "./pages/exam-prep/ExamPrepUpgrade";
+import AuthGuard from "./components/auth/AuthGuard";
 import AdminGuard from "./components/admin/AdminGuard";
 import AdminLayout from "./components/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -43,16 +44,22 @@ function App() {
             <AuthProvider>
             <ExamPrepProvider>
               <Routes>
+                {/* Public routes */}
                 <Route element={<ExamPrepLayout />}>
                   <Route path="/" element={<ExamPrepLanding />} />
-                  <Route path="/dashboard" element={<ExamPrepDashboard />} />
-                  <Route path="/plan" element={<ExamPrepStudyPlan />} />
-                  <Route path="/generator" element={<ExamPrepGenerator />} />
-                  <Route path="/assessment" element={<ExamPrepAssessment />} />
-                  <Route path="/quiz" element={<ExamPrepQuiz />} />
-                  <Route path="/saved" element={<ExamPrepSaved />} />
-                  <Route path="/upgrade" element={<ExamPrepUpgrade />} />
                   <Route path="/auth" element={<ExamPrepAuth />} />
+                  <Route path="/upgrade" element={<ExamPrepUpgrade />} />
+                </Route>
+                {/* Authenticated routes */}
+                <Route element={<AuthGuard />}>
+                  <Route element={<ExamPrepLayout />}>
+                    <Route path="/dashboard" element={<ExamPrepDashboard />} />
+                    <Route path="/plan" element={<ExamPrepStudyPlan />} />
+                    <Route path="/generator" element={<ExamPrepGenerator />} />
+                    <Route path="/assessment" element={<ExamPrepAssessment />} />
+                    <Route path="/quiz" element={<ExamPrepQuiz />} />
+                    <Route path="/saved" element={<ExamPrepSaved />} />
+                  </Route>
                 </Route>
                 <Route element={<AdminGuard />}>
                   <Route element={<AdminLayout />}>

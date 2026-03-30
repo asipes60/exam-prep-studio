@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import type {
   LicenseType,
   StudyFormat,
@@ -94,7 +94,8 @@ export function ExamPrepProvider({ children }: { children: React.ReactNode }) {
       } else {
         setActivePlan(null);
       }
-    } catch {
+    } catch (err) {
+      console.warn('Failed to load active plan:', err);
       setActivePlan(null);
     } finally {
       setPlanLoading(false);
@@ -116,7 +117,7 @@ export function ExamPrepProvider({ children }: { children: React.ReactNode }) {
         .filter((s) => s.totalQuestions > 0 && (s.correctAnswers / s.totalQuestions) < 0.6)
         .map((s) => s.domainName);
       setWeakAreas(weak);
-    }).catch(() => {});
+    }).catch((err) => console.warn('Failed to load domain scores:', err));
   }, [user, selectedLicense]);
 
   // Load saved materials and folders from Supabase when user changes
@@ -126,8 +127,8 @@ export function ExamPrepProvider({ children }: { children: React.ReactNode }) {
       setFolders([]);
       return;
     }
-    storage.getSavedMaterialsAsync().then(setSavedMaterials).catch(() => {});
-    storage.getFoldersAsync().then(setFolders).catch(() => {});
+    storage.getSavedMaterialsAsync().then(setSavedMaterials).catch((err) => console.warn('Failed to load materials:', err));
+    storage.getFoldersAsync().then(setFolders).catch((err) => console.warn('Failed to load folders:', err));
   }, [user]);
 
   const updateGeneratorConfig = useCallback((updates: Partial<GeneratorConfig>) => {
@@ -142,17 +143,19 @@ export function ExamPrepProvider({ children }: { children: React.ReactNode }) {
       const result = await generateStudyMaterial(config, user?.id);
       setGeneratedContent(result.content);
       setLatestAuditEntryId(result.auditEntryId);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Generation failed:', err);
-      toast.error(err.message || 'Generation failed. Please try again.');
+      toast.error(err instanceof Error ? err.message : 'Generation failed. Please try again.');
     } finally {
       setIsGenerating(false);
     }
   }, [user?.id]);
 
   const handleSaveMaterial = useCallback((material: SavedMaterial) => {
-    // Optimistic update
+    // Capture previous state for rollback
+    let previousMaterials: SavedMaterial[] = [];
     setSavedMaterials((prev) => {
+      previousMaterials = prev;
       const idx = prev.findIndex((m) => m.id === material.id);
       if (idx >= 0) {
         const updated = [...prev];
@@ -161,24 +164,36 @@ export function ExamPrepProvider({ children }: { children: React.ReactNode }) {
       }
       return [material, ...prev];
     });
-    // Persist to Supabase
-    storage.saveMaterialAsync(material).catch(() => {
+    // Persist to Supabase — rollback on failure
+    storage.saveMaterialAsync(material).catch((err) => {
+      console.warn('Failed to save material:', err);
+      setSavedMaterials(previousMaterials);
       toast.error('Failed to save material');
     });
   }, []);
 
   const handleDeleteMaterial = useCallback((id: string) => {
-    setSavedMaterials((prev) => prev.filter((m) => m.id !== id));
-    storage.deleteMaterialAsync(id).catch(() => {
+    let previousMaterials: SavedMaterial[] = [];
+    setSavedMaterials((prev) => {
+      previousMaterials = prev;
+      return prev.filter((m) => m.id !== id);
+    });
+    storage.deleteMaterialAsync(id).catch((err) => {
+      console.warn('Failed to delete material:', err);
+      setSavedMaterials(previousMaterials);
       toast.error('Failed to delete material');
     });
   }, []);
 
   const handleToggleFavorite = useCallback((id: string) => {
-    setSavedMaterials((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, isFavorite: !m.isFavorite } : m))
-    );
-    storage.toggleFavoriteAsync(id).catch(() => {
+    let previousMaterials: SavedMaterial[] = [];
+    setSavedMaterials((prev) => {
+      previousMaterials = prev;
+      return prev.map((m) => (m.id === id ? { ...m, isFavorite: !m.isFavorite } : m));
+    });
+    storage.toggleFavoriteAsync(id).catch((err) => {
+      console.warn('Failed to update favorite:', err);
+      setSavedMaterials(previousMaterials);
       toast.error('Failed to update favorite');
     });
   }, []);
@@ -194,58 +209,92 @@ export function ExamPrepProvider({ children }: { children: React.ReactNode }) {
     // Create in Supabase (will use real ID on next refresh)
     storage.createFolderAsync(name).then((folder) => {
       setFolders((prev) => prev.map((f) => (f.id === tempFolder.id ? folder : f)));
-    }).catch(() => {
+    }).catch((err) => {
+      console.warn('Failed to create folder:', err);
+      setFolders((prev) => prev.filter((f) => f.id !== tempFolder.id));
       toast.error('Failed to create folder');
     });
     return tempFolder;
   }, []);
 
   const handleDeleteFolder = useCallback((id: string) => {
-    setFolders((prev) => prev.filter((f) => f.id !== id));
-    setSavedMaterials((prev) =>
-      prev.map((m) => (m.folderId === id ? { ...m, folderId: undefined } : m))
-    );
-    storage.deleteFolderAsync(id).catch(() => {
+    let previousFolders: Folder[] = [];
+    let previousMaterials: SavedMaterial[] = [];
+    setFolders((prev) => {
+      previousFolders = prev;
+      return prev.filter((f) => f.id !== id);
+    });
+    setSavedMaterials((prev) => {
+      previousMaterials = prev;
+      return prev.map((m) => (m.folderId === id ? { ...m, folderId: undefined } : m));
+    });
+    storage.deleteFolderAsync(id).catch((err) => {
+      console.warn('Failed to delete folder:', err);
+      setFolders(previousFolders);
+      setSavedMaterials(previousMaterials);
       toast.error('Failed to delete folder');
     });
   }, []);
 
   const refreshSavedMaterials = useCallback(() => {
-    storage.getSavedMaterialsAsync().then(setSavedMaterials).catch(() => {});
-    storage.getFoldersAsync().then(setFolders).catch(() => {});
+    storage.getSavedMaterialsAsync().then(setSavedMaterials).catch((err) => console.warn('Failed to refresh materials:', err));
+    storage.getFoldersAsync().then(setFolders).catch((err) => console.warn('Failed to refresh folders:', err));
   }, []);
 
+  const value = useMemo<ExamPrepState>(() => ({
+    selectedLicense,
+    setSelectedLicense,
+    generatorConfig,
+    updateGeneratorConfig,
+    generatedContent,
+    isGenerating,
+    generateContent,
+    latestAuditEntryId,
+    pendingConfig,
+    setPendingConfig,
+    activePlan,
+    loadActivePlan,
+    planLoading,
+    weakAreas,
+    savedMaterials,
+    folders,
+    saveMaterial: handleSaveMaterial,
+    deleteMaterial: handleDeleteMaterial,
+    toggleFavorite: handleToggleFavorite,
+    createFolder: handleCreateFolder,
+    deleteFolder: handleDeleteFolder,
+    refreshSavedMaterials,
+    activeQuiz,
+    setActiveQuiz,
+    studyMode,
+    setStudyMode,
+  }), [
+    selectedLicense,
+    generatorConfig,
+    generatedContent,
+    isGenerating,
+    generateContent,
+    latestAuditEntryId,
+    pendingConfig,
+    activePlan,
+    loadActivePlan,
+    planLoading,
+    weakAreas,
+    savedMaterials,
+    folders,
+    handleSaveMaterial,
+    handleDeleteMaterial,
+    handleToggleFavorite,
+    handleCreateFolder,
+    handleDeleteFolder,
+    refreshSavedMaterials,
+    activeQuiz,
+    studyMode,
+    updateGeneratorConfig,
+  ]);
+
   return (
-    <ExamPrepContext.Provider
-      value={{
-        selectedLicense,
-        setSelectedLicense,
-        generatorConfig,
-        updateGeneratorConfig,
-        generatedContent,
-        isGenerating,
-        generateContent,
-        latestAuditEntryId,
-        pendingConfig,
-        setPendingConfig,
-        activePlan,
-        loadActivePlan,
-        planLoading,
-        weakAreas,
-        savedMaterials,
-        folders,
-        saveMaterial: handleSaveMaterial,
-        deleteMaterial: handleDeleteMaterial,
-        toggleFavorite: handleToggleFavorite,
-        createFolder: handleCreateFolder,
-        deleteFolder: handleDeleteFolder,
-        refreshSavedMaterials,
-        activeQuiz,
-        setActiveQuiz,
-        studyMode,
-        setStudyMode,
-      }}
-    >
+    <ExamPrepContext.Provider value={value}>
       {children}
     </ExamPrepContext.Provider>
   );

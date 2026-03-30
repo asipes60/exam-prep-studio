@@ -47,8 +47,8 @@ export default function ExamPrepAuth() {
     try {
       await signIn(signInEmail, signInPassword);
       navigate('/');
-    } catch (err: any) {
-      setError(err.message || 'Sign in failed. Please check your credentials.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Sign in failed. Please check your credentials.');
     } finally {
       setSubmitting(false);
     }
@@ -61,8 +61,8 @@ export default function ExamPrepAuth() {
     try {
       await signUp(signUpEmail, signUpPassword, signUpName);
       setSignUpSuccess(true);
-    } catch (err: any) {
-      setError(err.message || 'Sign up failed. Please try again.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Sign up failed. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -72,8 +72,8 @@ export default function ExamPrepAuth() {
     setError(null);
     try {
       await signInWithGoogle();
-    } catch (err: any) {
-      setError(err.message || 'Google sign in failed. Please try again.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Google sign in failed. Please try again.');
     }
   }
 
@@ -87,8 +87,8 @@ export default function ExamPrepAuth() {
     try {
       await resetPassword(signInEmail);
       setResetSent(true);
-    } catch (err: any) {
-      setError(err.message || 'Could not send reset email. Please try again.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Could not send reset email. Please try again.');
     } finally {
       setSubmitting(false);
     }

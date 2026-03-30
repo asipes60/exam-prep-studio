@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/use-auth';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, supabaseUrl, supabaseAnonKey } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,8 +16,6 @@ import {
   Shield,
   Settings,
 } from 'lucide-react';
-
-const SUPABASE_URL = 'https://axcwegrylfnadgbzgqnv.supabase.co';
 
 const freeFeatures = [
   '3 AI generations per day',
@@ -70,12 +68,12 @@ export default function ExamPrepUpgrade() {
         ? (import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID || 'MONTHLY_PRICE_ID_NOT_SET')
         : (import.meta.env.VITE_STRIPE_BIANNUAL_PRICE_ID || 'BIANNUAL_PRICE_ID_NOT_SET');
 
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/checkout`, {
+      const res = await fetch(`${supabaseUrl}/functions/v1/checkout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4Y3dlZ3J5bGZuYWRnYnpncW52Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MTk1NjQsImV4cCI6MjA4OTQ5NTU2NH0.ssSoyXjKpN8jcorVi2_suqRCSS_hs6nRqNVJnBUj6_Y',
+          'apikey': supabaseAnonKey,
         },
         body: JSON.stringify({ priceId }),
       });
@@ -86,8 +84,8 @@ export default function ExamPrepUpgrade() {
       } else {
         throw new Error(data.error || 'Failed to create checkout session');
       }
-    } catch (err: any) {
-      toast.error(err.message || 'Something went wrong. Please try again.');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -99,12 +97,12 @@ export default function ExamPrepUpgrade() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Not authenticated');
 
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/billing-portal`, {
+      const res = await fetch(`${supabaseUrl}/functions/v1/billing-portal`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4Y3dlZ3J5bGZuYWRnYnpncW52Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MTk1NjQsImV4cCI6MjA4OTQ5NTU2NH0.ssSoyXjKpN8jcorVi2_suqRCSS_hs6nRqNVJnBUj6_Y',
+          'apikey': supabaseAnonKey,
         },
         body: '{}',
       });
@@ -115,8 +113,8 @@ export default function ExamPrepUpgrade() {
       } else {
         throw new Error(data.error || 'Failed to open billing portal');
       }
-    } catch (err: any) {
-      toast.error(err.message || 'Something went wrong. Please try again.');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }

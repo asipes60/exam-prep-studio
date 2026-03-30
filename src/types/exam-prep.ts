@@ -7,7 +7,17 @@ export type StudyFormat =
   | 'clinical_vignette'
   | 'flashcards'
   | 'study_guide'
-  | 'quick_reference';
+  | 'quick_reference'
+  | 'study_plan';
+
+// Legacy formats from removed study modes — kept for backward compat with
+// saved materials and seed study plan data. Not selectable in the UI.
+export type LegacyStudyFormat =
+  | 'scenario_questions'
+  | 'mini_quiz'
+  | 'mock_exam'
+  | 'law_ethics_spotter'
+  | 'rationale_review';
 
 export type DifficultyLevel = 'beginner' | 'intermediate' | 'exam_level';
 
@@ -95,7 +105,7 @@ export interface StudyPlan {
   weeklyPlan: {
     week: number;
     focus: string;
-    materialTypes: StudyFormat[];
+    materialTypes: (StudyFormat | LegacyStudyFormat)[];
     reviewCadence: string;
     practiceFrequency: string;
     topics: string[];

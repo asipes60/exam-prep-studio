@@ -21,6 +21,7 @@ import type {
   StudyPlan,
   ClinicalVignette,
   SavedMaterial,
+  StudyFormat,
 } from '@/types/exam-prep';
 import {
   Save,
@@ -254,7 +255,7 @@ function StudyGuideView({ guide }: { guide: StudyGuide }) {
   );
 }
 
-function QuickReferenceView({ ref: qr }: { ref: QuickReference }) {
+function QuickReferenceView({ data: qr }: { data: QuickReference }) {
   return (
     <div className="space-y-4">
       <h3 className="font-montserrat font-semibold text-lg text-slate-900">{qr.title}</h3>
@@ -465,7 +466,7 @@ export default function GeneratorOutputPanel() {
       id: `saved-${Date.now()}`,
       name: getContentTitle(generatedContent),
       licenseType: selectedLicense,
-      studyFormat: generatedContent.type as any,
+      studyFormat: generatedContent.type as StudyFormat,
       topic: getContentTopic(generatedContent),
       content: generatedContent,
       createdAt: new Date().toISOString(),
@@ -611,14 +612,14 @@ function renderContent(content: GeneratedContent) {
     case 'study_guide':
       return <StudyGuideView guide={content.data} />;
     case 'quick_reference':
-      return <QuickReferenceView ref={content.data} />;
+      return <QuickReferenceView data={content.data} />;
     case 'study_plan':
       return <StudyPlanView plan={content.data} />;
     default: {
       // Backward compat: old saved materials with removed formats
       // (scenario_questions, mini_quiz, mock_exam, law_ethics_spotter, rationale_review)
       // all stored PracticeQuestion[] arrays — render them as questions
-      const data = (content as any).data;
+      const data = (content as unknown as { data: unknown }).data;
       if (Array.isArray(data) && data.length > 0 && 'stem' in data[0]) {
         return <QuestionsView questions={data} />;
       }

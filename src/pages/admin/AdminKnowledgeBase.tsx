@@ -81,7 +81,8 @@ export default function AdminKnowledgeBase() {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
       const pageText = textContent.items
-        .map((item: any) => item.str)
+        .filter((item) => 'str' in item)
+        .map((item) => (item as { str: string }).str)
         .join(' ');
       pages.push(pageText);
     }
@@ -160,7 +161,13 @@ export default function AdminKnowledgeBase() {
       query = query.eq('category', filterCategory);
     }
     if (search.trim()) {
-      query = query.or(`title.ilike.%${search}%,content.ilike.%${search}%`);
+      // Sanitize search input to prevent PostgREST filter injection.
+      // Commas split .or() conditions; parens group nested filters.
+      // Strip these characters so user input can't manipulate the filter.
+      const sanitized = search.trim().replace(/[,()]/g, '');
+      if (sanitized) {
+        query = query.or(`title.ilike.%${sanitized}%,content.ilike.%${sanitized}%`);
+      }
     }
 
     const { data, error } = await query;

@@ -204,9 +204,9 @@ export default function ExamPrepQuiz() {
       setShowRationale(false);
       setVignetteContextOpen(true);
       setStudyMode(mode);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to generate quiz:', err);
-      setLoadingProgress(err.message || 'Generation failed. Please try again.');
+      setLoadingProgress(err instanceof Error ? err.message : 'Generation failed. Please try again.');
       setTimeout(() => setLoadingProgress(''), 3000);
     } finally {
       setIsLoading(false);
