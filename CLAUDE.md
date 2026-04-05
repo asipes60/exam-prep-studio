@@ -46,11 +46,14 @@ The app supports four exam tracks. Every feature, content generator, and UI flow
 
 | Layer | Technology | Notes |
 |-------|-----------|-------|
-| Framework | Next.js (App Router) | SSR for SEO, API routes for Claude calls |
-| Frontend | React + Tailwind CSS | Utility-first styling, mobile-responsive |
-| Database | Supabase (PostgreSQL) | Auth, user profiles, study plans, progress data |
-| AI | Claude API (Anthropic) | Sonnet for practice content generation, Opus for study plans and clinical simulations |
-| Deployment | Vercel | Auto-scaling, edge functions |
+| Build tool | Vite | Dev server on port 3000, SWC for fast compilation |
+| Frontend | React 18 + React Router + Tailwind CSS | Client-side SPA, utility-first styling, mobile-responsive |
+| State | React Context + TanStack React Query | ExamPrepContext for app state, React Query for server state |
+| UI library | shadcn/ui | Pre-built accessible components (cards, dialogs, forms, etc.) |
+| Database | Supabase (PostgreSQL) | Auth, user profiles, study plans, progress data, RLS-enforced |
+| AI | Gemini 2.0 Flash (Google) | Via Supabase Edge Function — API key stays server-side |
+| Payments | Stripe | Checkout, webhooks, and billing portal via Supabase Edge Functions |
+| Deployment | Vercel | Static SPA with SPA fallback routing (`vercel.json`) |
 | Future mobile | React Native + NativeWind | Planned — architecture decisions now should not block this |
 
 ---
@@ -58,50 +61,76 @@ The app supports four exam tracks. Every feature, content generator, and UI flow
 ## Project Structure
 
 ```
-educare-exam-prep/
-├── CLAUDE.md                    # This file
-├── docs/                        # Reference documents from EduCare project
-│   ├── SKILL.md                 # EduCare course production system (reference for content standards)
-│   ├── PROJECT_CONTEXT_PACK.docx
-│   ├── nbcc_continuing_education_provider_policy.pdf
-│   ├── EduCare_Logo.png
-│   └── [other reference docs]
+exam-prep-studio/
+├── CLAUDE.md                        # This file
+├── INDEX.md                         # Study reference library navigation
+├── AI_REFERENCE_PROMPT.md           # AI curriculum generation instructions
+├── 01_California_Law_and_Ethics/    # CA Law & Ethics exam reference guide
+├── 02_NCMHCE_LPCC/                 # NCMHCE exam reference guide
+├── 03_LMFT_Clinical_Exam/          # LMFT Clinical exam reference guide
+├── 04_ASWB_Clinical_LCSW/          # ASWB Clinical exam reference guide
+├── 05_Practice_Questions/           # Practice questions across all exams
+├── 06_Free_Resources/               # Free resource master list
 ├── src/
-│   ├── app/                     # Next.js App Router pages
-│   │   ├── page.tsx             # Landing / marketing page
-│   │   ├── dashboard/           # User dashboard (study plan, progress)
-│   │   ├── onboarding/          # Exam track selection + diagnostic or manual setup
-│   │   ├── study/               # Active study session (questions, flashcards, simulations)
-│   │   ├── api/                 # API routes
-│   │   │   ├── generate-plan/   # Study plan generation (Claude Opus)
-│   │   │   ├── generate-content/# Practice content generation (Claude Sonnet)
-│   │   │   └── auth/            # Supabase auth handlers
-│   │   └── layout.tsx
-│   ├── components/              # Reusable UI components
-│   │   ├── ui/                  # Base UI (buttons, cards, inputs)
-│   │   ├── exam/                # Exam-specific components (MCQ, simulation, flashcard)
-│   │   ├── dashboard/           # Dashboard widgets (progress, calendar, stats)
-│   │   └── onboarding/          # Onboarding flow components
-│   ├── lib/                     # Utilities and configuration
-│   │   ├── claude.ts            # Claude API client wrapper
-│   │   ├── supabase.ts          # Supabase client
-│   │   ├── exam-tracks.ts       # Exam track definitions, content domains, question formats
-│   │   └── prompts/             # Prompt templates for each generation task
-│   │       ├── study-plan.ts    # Study plan generation prompts
-│   │       ├── mcq.ts           # Multiple-choice question prompts
-│   │       ├── simulation.ts    # NCMHCE clinical simulation prompts
-│   │       ├── flashcard.ts     # Flashcard generation prompts
-│   │       └── law-ethics.ts    # California law and ethics specific prompts
-│   ├── types/                   # TypeScript type definitions
-│   └── hooks/                   # Custom React hooks
+│   ├── main.tsx                     # React root mount
+│   ├── App.tsx                      # Router, providers, route definitions
+│   ├── index.css                    # Tailwind imports + global styles
+│   ├── contexts/
+│   │   └── ExamPrepContext.tsx       # Central app state (license, content, generation)
+│   ├── pages/
+│   │   ├── exam-prep/
+│   │   │   ├── ExamPrepLanding.tsx   # Public landing/marketing page
+│   │   │   ├── ExamPrepAuth.tsx      # Sign in / sign up
+│   │   │   ├── ExamPrepDashboard.tsx # Progress dashboard (domain scores, readiness)
+│   │   │   ├── ExamPrepGenerator.tsx # AI content generator (input + output panels)
+│   │   │   ├── ExamPrepQuiz.tsx      # Quiz engine (study + test modes, MCQ + vignette)
+│   │   │   ├── ExamPrepSaved.tsx     # Saved materials with folder organization
+│   │   │   ├── ExamPrepStudyPlan.tsx # Week-by-week study plan view
+│   │   │   ├── ExamPrepAssessment.tsx# Self-assessment + AI study plan generation
+│   │   │   └── ExamPrepUpgrade.tsx   # Pro subscription upgrade + billing
+│   │   └── admin/
+│   │       ├── AdminDashboard.tsx    # Admin overview (KB count, audit stats)
+│   │       ├── AdminKnowledgeBase.tsx# KB CRUD (corrections, regulatory content)
+│   │       └── AdminAuditLog.tsx     # Generation audit log (flag, notes, review)
+│   ├── components/
+│   │   ├── ui/                       # shadcn/ui base components
+│   │   ├── exam-prep/                # App layout (ExamPrepLayout)
+│   │   ├── auth/                     # AuthGuard route protection
+│   │   └── admin/                    # AdminGuard + AdminLayout
+│   ├── hooks/
+│   │   ├── use-auth.ts               # Auth state + profile (isAdmin, subscription)
+│   │   ├── use-mobile.tsx            # Mobile breakpoint detection
+│   │   └── use-toast.ts              # Toast notifications
+│   ├── lib/
+│   │   ├── exam-prep-ai.ts           # AI generation orchestrator (prompt building, KB injection, edge function calls)
+│   │   ├── exam-prep-storage.ts      # Supabase CRUD (materials, folders, quizzes, assessments, domain scores)
+│   │   ├── kb-retrieval.ts           # Knowledge base retrieval + relevance scoring
+│   │   ├── audit-log.ts              # Generation audit logging + admin flagging
+│   │   ├── validation.ts             # Zod schemas for AI response validation
+│   │   └── utils.ts                  # Tailwind merge utility
+│   ├── integrations/
+│   │   └── supabase/
+│   │       ├── client.ts             # Supabase client singleton
+│   │       └── types.ts              # Generated TypeScript types for DB schema
+│   └── data/
+│       └── exam-prep-data.ts         # Static exam data (domains, mock questions, flashcards)
 ├── supabase/
-│   └── migrations/              # Database schema migrations
-├── public/                      # Static assets
-│   └── images/
-├── package.json
+│   ├── config.toml                   # Supabase project config
+│   ├── migrations/                   # Database schema migrations (5 files)
+│   └── functions/
+│       ├── generate/index.ts         # Gemini 2.0 Flash AI generation (auth, rate limit, structured JSON)
+│       ├── checkout/index.ts         # Stripe Checkout session creator
+│       ├── stripe-webhook/index.ts   # Stripe webhook handler (service role, subscription sync)
+│       └── billing-portal/index.ts   # Stripe billing portal session creator
+├── public/
+│   └── favicon.svg
+├── index.html                        # Vite entry point
+├── vite.config.ts                    # Vite config (SWC, path aliases)
+├── vercel.json                       # Vercel SPA routing config
 ├── tailwind.config.ts
 ├── tsconfig.json
-└── .env.local                   # API keys (ANTHROPIC_API_KEY, SUPABASE_URL, etc.)
+├── components.json                   # shadcn/ui config
+└── .env.example                      # Environment variable template
 ```
 
 ---
@@ -120,13 +149,13 @@ educare-exam-prep/
    - **Option A: Diagnostic Assessment** → App delivers a 25–40 question diagnostic, scores it by content domain, and generates a personalized study plan weighted toward weak areas
    - **Option B: Custom Timeline** → User inputs their exam date and available study hours per week, and the app generates a structured study plan that covers all domains within that timeframe
 
-### Flow 2: Study Plan Generation (Claude Opus)
-- Input: Exam track, diagnostic results OR custom timeline, user's exam date
-- Output: A week-by-week study plan with daily topics, recommended content types (review → practice → simulated exam), and milestone checkpoints
+### Flow 2: Study Plan Generation (Gemini 2.0 Flash via Edge Function)
+- Input: Exam track, self-assessment ratings + weak areas, user preferences
+- Output: A 6–8 week study plan with weekly focus topics, material types, review cadence, and practice frequency
 - The plan must be stored in Supabase and editable by the user
 - The plan must adapt: if the user's practice scores show persistent weakness in a domain, the plan should surface more content in that area
 
-### Flow 3: Active Study Session (Claude Sonnet + Opus)
+### Flow 3: Active Study Session (Gemini 2.0 Flash via Edge Function)
 - User opens a study session from their dashboard
 - App serves content matched to today's study plan topic and exam track:
   - **MCQ mode:** Timed or untimed multiple-choice questions with detailed rationales
@@ -146,7 +175,7 @@ educare-exam-prep/
 
 ## AI Content Generation Rules
 
-These rules apply to ALL content generated by the Claude API within this app. They are non-negotiable.
+These rules apply to ALL content generated by the AI (Gemini 2.0 Flash) within this app. They are non-negotiable.
 
 ### Accuracy Standards
 - Every legal citation must reference the actual statute, code section, or regulation (e.g., "BPC § 4999.90" not "California law states...")
@@ -180,24 +209,42 @@ These rules apply to ALL content generated by the Claude API within this app. Th
 
 ## Database Schema (Supabase)
 
-Design the schema to support these core tables at minimum:
+The following tables are implemented with RLS enabled on all tables:
 
-- **users** — id, email, name, license_type, created_at
-- **exam_tracks** — id, user_id, track_type (enum: law_ethics, mft_clinical, ncmhce, aswb_clinical), exam_date, status
-- **study_plans** — id, user_id, exam_track_id, plan_data (JSONB), created_at, updated_at
-- **diagnostic_results** — id, user_id, exam_track_id, scores_by_domain (JSONB), completed_at
-- **study_sessions** — id, user_id, exam_track_id, session_type (enum: mcq, flashcard, simulation, law_scenario), content_domain, score, total_questions, completed_at
-- **generated_content** — id, exam_track_id, content_type, content_domain, content_data (JSONB), quality_flag, created_at
+- **profiles** — extends auth.users; id, email, name, preferred_license, subscription_status, stripe_customer_id, daily_generations, is_admin
+- **exam_prep_materials** — saved study materials; user_id, name, license_type, study_format, topic, content (JSONB), is_favorite, folder_id, tags
+- **exam_prep_folders** — folder organization for saved materials; user_id, name
+- **exam_prep_quiz_sessions** — quiz history; user_id, license_type, mode (study/test), questions (JSONB), results (JSONB), score, format, topic
+- **exam_prep_usage** — generation usage tracking (append-only); user_id, generation_type, license_type, topic
+- **exam_prep_assessments** — self-assessment + AI study plans; user_id, license_type, ratings (JSONB), weak_areas, strong_areas, suggested_plan (JSONB), completed_weeks
+- **exam_prep_domain_scores** — accumulated quiz performance by domain; user_id, license_type, domain_id, domain_name, total_questions, correct_answers (unique on user+license+domain)
+- **subscriptions** — Stripe subscription tracking (read-only for users, written by webhook via service role); user_id, stripe_subscription_id, status, period dates
+- **admin_knowledge_base** — admin-managed reference content injected into AI prompts; title, category, content, tags, license_types, topics
+- **audit_log** — full generation audit trail; user_id, prompt_text, output_text, system_prompt, model_used, generation_time_ms, flagged, admin_notes, kb_entries_used
+
+**RPC functions:**
+- `upsert_domain_score(p_user_id, p_license_type, p_domain_id, p_domain_name, p_correct, p_total)` — atomic upsert to prevent race conditions
 
 ---
 
 ## Environment Variables
 
+**Frontend (Vite — prefixed with `VITE_`, embedded in client bundle):**
 ```
-ANTHROPIC_API_KEY=
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_STRIPE_MONTHLY_PRICE_ID=price_xxx    # Stripe price ID for monthly plan ($24/mo)
+VITE_STRIPE_BIANNUAL_PRICE_ID=price_xxx   # Stripe price ID for 6-month plan ($119)
+```
+
+**Supabase Edge Functions (set as Supabase secrets, NOT exposed to frontend):**
+```
+GEMINI_API_KEY=            # Google Gemini 2.0 Flash API key
+STRIPE_SECRET_KEY=         # Stripe secret key (sk_test_... or sk_live_...)
+STRIPE_WEBHOOK_SECRET=     # Stripe webhook signing secret (whsec_...)
+SUPABASE_URL=              # Auto-set by Supabase
+SUPABASE_ANON_KEY=         # Auto-set by Supabase
+SUPABASE_SERVICE_ROLE_KEY= # Auto-set by Supabase (used by stripe-webhook only)
 ```
 
 ---
@@ -206,10 +253,11 @@ SUPABASE_SERVICE_ROLE_KEY=
 
 ### Code Standards
 - TypeScript strict mode — no `any` types
-- All API routes must validate input and handle errors gracefully
-- Claude API calls must include timeout handling and retry logic
-- Never expose API keys to the client — all Claude calls go through Next.js API routes
-- Use React Server Components where possible, Client Components only when interactivity is required
+- All Supabase Edge Functions must validate input and handle errors gracefully
+- AI generation calls must include timeout handling (30s default, 45s for study plans) and retry logic (2 retries with exponential backoff)
+- Never expose API keys to the client — all AI and Stripe calls go through Supabase Edge Functions
+- Zod validation on all AI responses before rendering (`src/lib/validation.ts`)
+- RLS enforced on all Supabase tables — client uses anon key with user JWT, service role only in webhook edge function
 
 ### UX Principles
 - Mobile-first responsive design (users will study on their phones)
@@ -229,12 +277,12 @@ SUPABASE_SERVICE_ROLE_KEY=
 
 Build in this order:
 
-1. **Project scaffolding** — Next.js + Tailwind + Supabase setup, env config, basic layout
-2. **Auth flow** — Sign up, sign in, protected routes
-3. **Onboarding flow** — License type selection, exam track selection, pathway choice (diagnostic vs. custom)
-4. **CA Law & Ethics exam track first** — This is the flagship. Build the MCQ generator, flashcard generator, and law scenario mode for this track before touching the other three.
-5. **Study plan generator** — Both diagnostic-driven and custom timeline paths
-6. **Dashboard** — Progress visualization, study plan display, session launcher
+1. ~~**Project scaffolding** — Vite + React + Tailwind + Supabase setup~~ ✅
+2. ~~**Auth flow** — Email/password + Google OAuth, AuthGuard, AdminGuard~~ ✅
+3. **Onboarding flow** — License selection wizard (in progress), exam track auto-mapping, pathway choice
+4. ~~**CA Law & Ethics exam track first** — MCQ generator, flashcard generator, quiz engine~~ ✅
+5. ~~**Study plan generator** — Self-assessment driven, 6–8 week AI-generated plans~~ ✅
+6. ~~**Dashboard** — Domain scores, readiness score, quiz history, study plan view~~ ✅
 7. **Remaining exam tracks** — MFT Clinical, NCMHCE (with simulation mode), ASWB Clinical
 8. **Adaptive features** — Plan adjustment based on performance, weak area detection
 
