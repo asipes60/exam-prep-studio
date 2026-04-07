@@ -2,7 +2,7 @@
 // Maps Gemini-generated question topics/competency areas back to exam domains.
 
 import { EXAM_DATA } from '@/data/exam-prep-data';
-import type { LicenseType, PracticeQuestion, ClinicalVignette, QuizSession } from '@/types/exam-prep';
+import type { LicenseType, PracticeQuestion, ClinicalVignette, DMDecisionPoint, QuizSession } from '@/types/exam-prep';
 
 export interface DomainMatch {
   domainId: string;
@@ -82,27 +82,58 @@ export function computeDomainScoresFromQuiz(session: QuizSession): DomainScoreEn
   const scoreMap = new Map<string, DomainScoreEntry>();
 
   if (session.format === 'clinical_vignette' && session.vignettes) {
-    // Vignette quiz: iterate through vignettes and their questions
-    let resultIdx = 0;
-    for (const vignette of session.vignettes) {
-      for (const q of vignette.questions) {
-        const match = mapTopicToDomain(session.licenseType, q.competencyArea);
-        if (match) {
+    // Check for two-phase NCMHCE format
+    const hasTwoPhaseData = session.vignettes.some(
+      (v) => v.igPhase && v.dmPhase && v.dmPhase.decisionPoints.length > 0
+    );
+
+    if (hasTwoPhaseData) {
+      // Two-phase: map DM decision points to domains (IG actions don't have competency areas)
+      // DM results come after IG results — find them by matching IDs
+      for (const vignette of session.vignettes) {
+        if (!vignette.dmPhase) continue;
+        for (const dp of vignette.dmPhase.decisionPoints) {
+          const match = mapTopicToDomain(session.licenseType, dp.competencyArea);
+          if (!match) continue;
+          const result = session.results.find((r) => r.questionId === dp.id);
+          if (!result) continue;
           const existing = scoreMap.get(match.domainId);
-          const result = session.results[resultIdx];
           if (existing) {
             existing.total++;
-            if (result?.isCorrect) existing.correct++;
+            if (result.isCorrect) existing.correct++;
           } else {
             scoreMap.set(match.domainId, {
               domainId: match.domainId,
               domainName: match.domainName,
-              correct: result?.isCorrect ? 1 : 0,
+              correct: result.isCorrect ? 1 : 0,
               total: 1,
             });
           }
         }
-        resultIdx++;
+      }
+    } else {
+      // Legacy vignette format: iterate through flat questions
+      let resultIdx = 0;
+      for (const vignette of session.vignettes) {
+        for (const q of vignette.questions) {
+          const match = mapTopicToDomain(session.licenseType, q.competencyArea);
+          if (match) {
+            const existing = scoreMap.get(match.domainId);
+            const result = session.results[resultIdx];
+            if (existing) {
+              existing.total++;
+              if (result?.isCorrect) existing.correct++;
+            } else {
+              scoreMap.set(match.domainId, {
+                domainId: match.domainId,
+                domainName: match.domainName,
+                correct: result?.isCorrect ? 1 : 0,
+                total: 1,
+              });
+            }
+          }
+          resultIdx++;
+        }
       }
     }
   } else {

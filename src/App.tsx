@@ -17,6 +17,7 @@ import ExamPrepAuth from "./pages/exam-prep/ExamPrepAuth";
 import ExamPrepDashboard from "./pages/exam-prep/ExamPrepDashboard";
 import ExamPrepStudyPlan from "./pages/exam-prep/ExamPrepStudyPlan";
 import ExamPrepUpgrade from "./pages/exam-prep/ExamPrepUpgrade";
+import ExamPrepOnboarding from "./pages/exam-prep/ExamPrepOnboarding";
 import AuthGuard from "./components/auth/AuthGuard";
 import AdminGuard from "./components/admin/AdminGuard";
 import AdminLayout from "./components/admin/AdminLayout";
@@ -53,6 +54,7 @@ function App() {
                 {/* Authenticated routes */}
                 <Route element={<AuthGuard />}>
                   <Route element={<ExamPrepLayout />}>
+                    <Route path="/onboarding" element={<ExamPrepOnboarding />} />
                     <Route path="/dashboard" element={<ExamPrepDashboard />} />
                     <Route path="/plan" element={<ExamPrepStudyPlan />} />
                     <Route path="/generator" element={<ExamPrepGenerator />} />

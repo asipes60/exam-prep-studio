@@ -79,14 +79,50 @@ const clinicalVignetteQuestionSchema = z.object({
   incorrectRationales: z.array(incorrectRationaleSchema).default([]),
 });
 
+// ─── Two-Phase NCMHCE Schemas ──────────────────────────────────────────
+
+const igActionRatingSchema = z.enum(['most_productive', 'productive', 'unproductive', 'counterproductive']);
+
+const igActionSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  rating: igActionRatingSchema,
+  rationale: z.string(),
+});
+
+const dmDecisionPointSchema = z.object({
+  id: z.string(),
+  questionText: z.string(),
+  competencyArea: z.string(),
+  choices: z.array(choiceSchema).min(2),
+  correctAnswer: z.string(),
+  rationale: z.string(),
+  incorrectRationales: z.array(incorrectRationaleSchema).default([]),
+});
+
+const igPhaseSchema = z.object({
+  prompt: z.string(),
+  actions: z.array(igActionSchema).min(1),
+});
+
+const dmPhaseSchema = z.object({
+  prompt: z.string(),
+  decisionPoints: z.array(dmDecisionPointSchema).min(1),
+});
+
 const clinicalVignetteSchema = z.object({
   id: z.string(),
   clientPresentation: z.string(),
   demographics: z.string(),
   presentingProblem: z.string(),
   relevantHistory: z.string(),
-  questions: z.array(clinicalVignetteQuestionSchema).min(1),
-});
+  questions: z.array(clinicalVignetteQuestionSchema).default([]),
+  igPhase: igPhaseSchema.optional(),
+  dmPhase: dmPhaseSchema.optional(),
+}).refine(
+  (v) => v.questions.length > 0 || (v.igPhase && v.dmPhase),
+  { message: 'Vignette must have either questions or both igPhase and dmPhase' },
+);
 
 // ─── Study Plan ─────────────────────────────────────────────────────────
 

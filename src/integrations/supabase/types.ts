@@ -401,7 +401,9 @@ export type Database = {
           id: string
           is_admin: boolean | null
           name: string | null
+          onboarding_completed_at: string | null
           preferred_license: string | null
+          selected_exams: string[] | null
           stripe_customer_id: string | null
           subscription_status: string
           updated_at: string
@@ -414,7 +416,9 @@ export type Database = {
           id: string
           is_admin?: boolean | null
           name?: string | null
+          onboarding_completed_at?: string | null
           preferred_license?: string | null
+          selected_exams?: string[] | null
           stripe_customer_id?: string | null
           subscription_status?: string
           updated_at?: string
@@ -427,7 +431,9 @@ export type Database = {
           id?: string
           is_admin?: boolean | null
           name?: string | null
+          onboarding_completed_at?: string | null
           preferred_license?: string | null
+          selected_exams?: string[] | null
           stripe_customer_id?: string | null
           subscription_status?: string
           updated_at?: string

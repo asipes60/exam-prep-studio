@@ -24,7 +24,7 @@ export default function ExamPrepAuth() {
 
   useEffect(() => {
     if (!loading && isAuthenticated) {
-      navigate('/');
+      navigate('/dashboard');
     }
   }, [loading, isAuthenticated, navigate]);
 
@@ -46,7 +46,7 @@ export default function ExamPrepAuth() {
     setSubmitting(true);
     try {
       await signIn(signInEmail, signInPassword);
-      navigate('/');
+      navigate('/dashboard');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Sign in failed. Please check your credentials.');
     } finally {

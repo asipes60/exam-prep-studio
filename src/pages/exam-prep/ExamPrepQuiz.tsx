@@ -22,6 +22,9 @@ import type {
   PracticeQuestion,
   ClinicalVignette,
   ClinicalVignetteQuestion,
+  IGAction,
+  IGActionRating,
+  DMDecisionPoint,
   QuizSession,
   QuizResult,
   StudyMode,
@@ -43,8 +46,22 @@ import {
 } from 'lucide-react';
 
 type QuizState = 'setup' | 'active' | 'review';
+type SimPhase = 'ig' | 'dm';
 
-/** Flatten vignettes into a linear question list for quiz navigation */
+/** Check if a vignette uses the two-phase NCMHCE format */
+function hasTwoPhase(v: ClinicalVignette): boolean {
+  return !!(v.igPhase && v.dmPhase && v.igPhase.actions.length > 0 && v.dmPhase.decisionPoints.length > 0);
+}
+
+/** IG action rating display config */
+const IG_RATING_CONFIG: Record<IGActionRating, { label: string; color: string; bgColor: string; points: number }> = {
+  most_productive: { label: 'Most Productive', color: 'text-emerald-700', bgColor: 'bg-emerald-50 border-emerald-200', points: 3 },
+  productive: { label: 'Productive', color: 'text-blue-700', bgColor: 'bg-blue-50 border-blue-200', points: 2 },
+  unproductive: { label: 'Unproductive', color: 'text-amber-700', bgColor: 'bg-amber-50 border-amber-200', points: 0 },
+  counterproductive: { label: 'Counterproductive', color: 'text-red-700', bgColor: 'bg-red-50 border-red-200', points: -1 },
+};
+
+/** Flatten vignettes into a linear question list for quiz navigation (legacy format) */
 function flattenVignetteQuestions(
   vignettes: ClinicalVignette[],
 ): { question: ClinicalVignetteQuestion; vignetteIdx: number }[] {
@@ -87,6 +104,46 @@ function getQuestionCountOptions(
     : [{ value: 10, label: '10 Questions' }];
 }
 
+// ─── Track-specific tips ────────────────────────────────────────────────
+const TRACK_TIPS: Record<LicenseType, { title: string; tips: string[] }> = {
+  LPCC: {
+    title: 'NCMHCE Simulation Tips',
+    tips: [
+      'The NCMHCE uses clinical simulations, not standard MCQs — practice with the two-phase format',
+      'In Information Gathering, select only what is clinically necessary. "Less is more" — unnecessary actions lose points',
+      'Decision Making tests clinical judgment under ambiguity. The "most correct" answer may not be the "ideal" answer',
+      'Focus on: DSM-5-TR diagnosis, treatment selection, risk assessment, and ethical decision-making',
+    ],
+  },
+  LMFT: {
+    title: 'California MFT Clinical Exam Tips',
+    tips: [
+      'Know the systemic theories cold: Structural (Minuchin), Strategic (Haley), Bowenian, EFT (Johnson), Gottman, Narrative, SFBT',
+      'Questions emphasize relational and systemic thinking — avoid individually-focused answers',
+      'Expect scenario-based questions where you must identify the correct theory or intervention',
+      'Crisis management and domestic violence protocols are heavily tested',
+    ],
+  },
+  LCSW: {
+    title: 'ASWB Clinical Exam Tips',
+    tips: [
+      'Think through the Person-in-Environment (PIE) lens — social work values permeate every answer',
+      'NASW Code of Ethics is the single most tested content area. Know specific standards, not just principles',
+      'Domain weights matter: Assessment/Diagnosis (30%) > Interventions (27%) > Human Development (24%) > Ethics (19%)',
+      'The exam uses three-option (A/B/C) format as of 2025 — no process of elimination with 4 choices',
+    ],
+  },
+  LAW_ETHICS: {
+    title: 'California Law & Ethics Tips',
+    tips: [
+      'Know the difference between mandatory and permissive reporting obligations',
+      'Tarasoff, CANRA, elder abuse reporting, and LPS Act are the highest-yield topics',
+      'Understand where California law differs from federal law (HIPAA) and other states',
+      'Ethics code differences matter: NASW (LCSW) vs. AAMFT/CAMFT (LMFT) vs. ACA (LPCC)',
+    ],
+  },
+};
+
 export default function ExamPrepQuiz() {
   const { selectedLicense, setSelectedLicense, studyMode, setStudyMode } = useExamPrep();
   const { user } = useAuth();
@@ -118,10 +175,21 @@ export default function ExamPrepQuiz() {
   const [questionStartTime, setQuestionStartTime] = useState(0);
   const [vignetteContextOpen, setVignetteContextOpen] = useState(true);
 
+  // Two-phase NCMHCE simulation state
+  const [simPhase, setSimPhase] = useState<SimPhase>('ig');
+  const [currentVignetteIdx, setCurrentVignetteIdx] = useState(0);
+  const [selectedIGActions, setSelectedIGActions] = useState<Set<string>>(new Set());
+  const [igRevealed, setIgRevealed] = useState(false);
+  const [dmIdx, setDmIdx] = useState(0);
+
   // Derived
   const format = license ? getExamFormat(license) : 'practice_questions';
-  const totalQuestions =
-    format === 'clinical_vignette' ? flatQuestions.length : questions.length;
+  const isTwoPhase = format === 'clinical_vignette' && vignettes.length > 0 && vignettes.some(hasTwoPhase);
+  const totalQuestions = isTwoPhase
+    ? vignettes.reduce((sum, v) => sum + (v.dmPhase?.decisionPoints.length ?? 0), 0)
+    : format === 'clinical_vignette'
+    ? flatQuestions.length
+    : questions.length;
 
   // Reset question count when license changes
   useEffect(() => {
@@ -204,6 +272,12 @@ export default function ExamPrepQuiz() {
       setShowRationale(false);
       setVignetteContextOpen(true);
       setStudyMode(mode);
+      // Reset two-phase state
+      setSimPhase('ig');
+      setCurrentVignetteIdx(0);
+      setSelectedIGActions(new Set());
+      setIgRevealed(false);
+      setDmIdx(0);
     } catch (err: unknown) {
       console.error('Failed to generate quiz:', err);
       setLoadingProgress(err instanceof Error ? err.message : 'Generation failed. Please try again.');
@@ -428,6 +502,23 @@ export default function ExamPrepQuiz() {
               </div>
             )}
 
+            {/* Track-specific tips */}
+            {license && (
+              <div className="rounded-lg bg-slate-50 border border-slate-200 p-4">
+                <p className="text-sm font-medium text-slate-700 mb-2">
+                  {TRACK_TIPS[license].title}
+                </p>
+                <ul className="space-y-1.5">
+                  {TRACK_TIPS[license].tips.map((tip, i) => (
+                    <li key={i} className="text-xs text-slate-500 flex items-start gap-2">
+                      <span className="text-blue-500 mt-0.5 shrink-0">•</span>
+                      {tip}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <Button
               className="w-full bg-blue-600 hover:bg-blue-700 h-11"
               onClick={handleStart}
@@ -451,7 +542,325 @@ export default function ExamPrepQuiz() {
     );
   }
 
-  // ─── ACTIVE QUIZ ─────────────────────────────────────────────────────
+  // ─── TWO-PHASE NCMHCE SIMULATION ─────────────────────────────────────
+
+  if (state === 'active' && isTwoPhase) {
+    const currentVignette = vignettes[currentVignetteIdx];
+    if (!currentVignette) return null;
+
+    const igActions = currentVignette.igPhase?.actions ?? [];
+    const dmPoints = currentVignette.dmPhase?.decisionPoints ?? [];
+    const currentDM = dmPoints[dmIdx];
+
+    // Calculate overall progress across all vignettes
+    const totalDMPoints = vignettes.reduce((s, v) => s + (v.dmPhase?.decisionPoints.length ?? 0), 0);
+    const completedDMBefore = vignettes.slice(0, currentVignetteIdx).reduce((s, v) => s + (v.dmPhase?.decisionPoints.length ?? 0), 0);
+    const overallProgress = totalDMPoints > 0
+      ? ((completedDMBefore + (simPhase === 'dm' ? dmIdx : 0)) / totalDMPoints) * 100
+      : 0;
+
+    function handleIGToggle(actionId: string) {
+      if (igRevealed) return;
+      setSelectedIGActions((prev) => {
+        const next = new Set(prev);
+        if (next.has(actionId)) next.delete(actionId);
+        else next.add(actionId);
+        return next;
+      });
+    }
+
+    function handleIGSubmit() {
+      const timeSpent = Date.now() - questionStartTime;
+      // Record results for each selected action
+      igActions.forEach((action) => {
+        if (selectedIGActions.has(action.id)) {
+          setResults((prev) => [
+            ...prev,
+            {
+              questionId: action.id,
+              selectedAnswer: action.text,
+              isCorrect: action.rating === 'most_productive' || action.rating === 'productive',
+              timeSpent,
+              igRating: action.rating,
+            },
+          ]);
+        }
+      });
+      setIgRevealed(true);
+    }
+
+    function handleIGContinue() {
+      setSimPhase('dm');
+      setDmIdx(0);
+      setSelectedAnswer(null);
+      setShowRationale(false);
+      setQuestionStartTime(Date.now());
+    }
+
+    function handleDMAnswer(label: string) {
+      if (selectedAnswer || !currentDM) return;
+      setSelectedAnswer(label);
+      const isCorrect = label === currentDM.correctAnswer;
+      const timeSpent = Date.now() - questionStartTime;
+      setResults((prev) => [
+        ...prev,
+        { questionId: currentDM.id, selectedAnswer: label, isCorrect, timeSpent },
+      ]);
+      if (mode === 'study') setShowRationale(true);
+    }
+
+    function handleDMNext() {
+      if (dmIdx < dmPoints.length - 1) {
+        setDmIdx(dmIdx + 1);
+        setSelectedAnswer(null);
+        setShowRationale(false);
+        setQuestionStartTime(Date.now());
+      } else if (currentVignetteIdx < vignettes.length - 1) {
+        // Move to next vignette
+        setCurrentVignetteIdx(currentVignetteIdx + 1);
+        setSimPhase('ig');
+        setSelectedIGActions(new Set());
+        setIgRevealed(false);
+        setDmIdx(0);
+        setSelectedAnswer(null);
+        setShowRationale(false);
+        setQuestionStartTime(Date.now());
+      } else {
+        finishQuiz();
+      }
+    }
+
+    return (
+      <div className="container-custom py-8 md:py-12 max-w-3xl">
+        {/* Progress Bar */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-slate-500">
+              Simulation {currentVignetteIdx + 1} of {vignettes.length}
+              {simPhase === 'dm' && ` — Decision ${dmIdx + 1} of ${dmPoints.length}`}
+            </span>
+            <div className="flex items-center gap-3">
+              {mode === 'test' && (
+                <span className="flex items-center gap-1 text-sm text-slate-500">
+                  <Clock className="w-4 h-4" />
+                  {formatTime(elapsed)}
+                </span>
+              )}
+              <Badge variant={simPhase === 'ig' ? 'secondary' : 'default'}>
+                {simPhase === 'ig' ? 'Information Gathering' : 'Decision Making'}
+              </Badge>
+            </div>
+          </div>
+          <Progress value={overallProgress} className="h-2" />
+        </div>
+
+        {/* Vignette Context — always visible */}
+        <Card className="border-indigo-200 bg-indigo-50/30 mb-4">
+          <CardContent className="p-4">
+            <button
+              className="flex items-center justify-between w-full text-left"
+              onClick={() => setVignetteContextOpen(!vignetteContextOpen)}
+            >
+              <span className="font-semibold text-sm text-indigo-800">
+                Client Presentation — Simulation {currentVignetteIdx + 1}
+              </span>
+              {vignetteContextOpen ? (
+                <ChevronUp className="w-4 h-4 text-indigo-400" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-indigo-400" />
+              )}
+            </button>
+            {vignetteContextOpen && (
+              <div className="mt-3 space-y-2 text-sm text-slate-700">
+                <p>{currentVignette.clientPresentation}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
+                  <div className="bg-white rounded p-2 border border-indigo-100">
+                    <p className="text-xs font-medium text-indigo-600 mb-0.5">Demographics</p>
+                    <p className="text-xs text-slate-600">{currentVignette.demographics}</p>
+                  </div>
+                  <div className="bg-white rounded p-2 border border-indigo-100">
+                    <p className="text-xs font-medium text-indigo-600 mb-0.5">Presenting Problem</p>
+                    <p className="text-xs text-slate-600">{currentVignette.presentingProblem}</p>
+                  </div>
+                  <div className="bg-white rounded p-2 border border-indigo-100">
+                    <p className="text-xs font-medium text-indigo-600 mb-0.5">Relevant History</p>
+                    <p className="text-xs text-slate-600">{currentVignette.relevantHistory}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* IG Phase */}
+        {simPhase === 'ig' && (
+          <Card className="border-slate-200">
+            <CardContent className="p-6">
+              <div className="mb-4">
+                <Badge variant="secondary" className="mb-2">Information Gathering</Badge>
+                <p className="text-slate-800 leading-relaxed">
+                  {currentVignette.igPhase?.prompt ?? 'Select the clinical actions you would take with this client. Choose all that apply.'}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                {igActions.map((action) => {
+                  const isSelected = selectedIGActions.has(action.id);
+                  const ratingConfig = IG_RATING_CONFIG[action.rating];
+
+                  let style = isSelected
+                    ? 'border-blue-400 bg-blue-50'
+                    : 'border-slate-200 hover:border-blue-200 hover:bg-blue-50/30';
+
+                  if (igRevealed) {
+                    style = isSelected
+                      ? `${ratingConfig.bgColor} border`
+                      : 'border-slate-200 opacity-50';
+                  }
+
+                  return (
+                    <button
+                      key={action.id}
+                      className={`w-full text-left p-3 rounded-lg border transition-all ${style}`}
+                      onClick={() => handleIGToggle(action.id)}
+                      disabled={igRevealed}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 mt-0.5 ${
+                          isSelected ? 'border-blue-500 bg-blue-500' : 'border-slate-300'
+                        }`}>
+                          {isSelected && <CheckCircle className="w-3 h-3 text-white" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm text-slate-700">{action.text}</span>
+                          {igRevealed && (
+                            <div className="mt-1">
+                              <span className={`text-xs font-medium ${ratingConfig.color}`}>
+                                {ratingConfig.label}
+                              </span>
+                              {mode === 'study' && (
+                                <p className="text-xs text-slate-500 mt-1">{action.rationale}</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                {!igRevealed ? (
+                  <Button
+                    onClick={handleIGSubmit}
+                    disabled={selectedIGActions.size === 0}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    Submit Selections ({selectedIGActions.size} selected)
+                  </Button>
+                ) : (
+                  <Button onClick={handleIGContinue} className="bg-blue-600 hover:bg-blue-700">
+                    Continue to Decision Making <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* DM Phase */}
+        {simPhase === 'dm' && currentDM && (
+          <Card className="border-slate-200">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Badge variant="default">Decision Making</Badge>
+                <Badge variant="secondary">{currentDM.competencyArea}</Badge>
+              </div>
+
+              <p className="text-slate-800 leading-relaxed mb-6">{currentDM.questionText}</p>
+
+              <div className="space-y-3">
+                {currentDM.choices.map((choice) => {
+                  const isSelected = selectedAnswer === choice.label;
+                  const isCorrectChoice = choice.label === currentDM.correctAnswer;
+                  const hasAnswered = !!selectedAnswer;
+
+                  let choiceStyle =
+                    'border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 cursor-pointer';
+                  if (hasAnswered && mode === 'study') {
+                    if (isCorrectChoice) choiceStyle = 'border-emerald-300 bg-emerald-50';
+                    else if (isSelected) choiceStyle = 'border-red-300 bg-red-50';
+                    else choiceStyle = 'border-slate-200 opacity-60';
+                  } else if (hasAnswered && mode === 'test') {
+                    if (isSelected) choiceStyle = 'border-blue-400 bg-blue-50';
+                    else choiceStyle = 'border-slate-200 opacity-60';
+                  }
+
+                  return (
+                    <button
+                      key={choice.label}
+                      className={`w-full text-left p-4 rounded-lg border transition-all ${choiceStyle}`}
+                      onClick={() => handleDMAnswer(choice.label)}
+                      disabled={hasAnswered}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="w-7 h-7 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold shrink-0">
+                          {choice.label}
+                        </span>
+                        <span className="text-sm text-slate-700 pt-0.5">{choice.text}</span>
+                        {hasAnswered && mode === 'study' && isCorrectChoice && (
+                          <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0 ml-auto" />
+                        )}
+                        {hasAnswered && mode === 'study' && isSelected && !isCorrectChoice && (
+                          <XCircle className="w-5 h-5 text-red-500 shrink-0 ml-auto" />
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Study Mode Rationale */}
+              {showRationale && mode === 'study' && (
+                <div className="mt-6 p-4 bg-slate-50 rounded-lg text-sm space-y-3 animate-fade-in">
+                  <div>
+                    <p className="font-semibold text-emerald-700 mb-1">
+                      Correct Answer: {currentDM.correctAnswer}
+                    </p>
+                    <p className="text-slate-700">{currentDM.rationale}</p>
+                  </div>
+                  {currentDM.incorrectRationales.map((ir) => (
+                    <div key={ir.label}>
+                      <p className="font-medium text-slate-500">Why not {ir.label}:</p>
+                      <p className="text-slate-600">{ir.explanation}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Next Button */}
+              {selectedAnswer && (
+                <div className="mt-6 flex justify-end">
+                  <Button onClick={handleDMNext} className="bg-blue-600 hover:bg-blue-700">
+                    {dmIdx < dmPoints.length - 1 ? (
+                      <>Next Decision <ArrowRight className="w-4 h-4 ml-2" /></>
+                    ) : currentVignetteIdx < vignettes.length - 1 ? (
+                      <>Next Simulation <ArrowRight className="w-4 h-4 ml-2" /></>
+                    ) : (
+                      <>Finish Quiz <CheckCircle className="w-4 h-4 ml-2" /></>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  }
+
+  // ─── ACTIVE QUIZ (MCQ + Legacy Vignette) ────────────────────────────
 
   if (state === 'active' && currentQuestion) {
     // Vignette context card (LPCC only)

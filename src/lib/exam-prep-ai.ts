@@ -94,15 +94,31 @@ DISCLAIMER TO INCLUDE:
 This content is for educational study purposes only and does not replace official exam prep materials, legal consultation, or clinical supervision.`;
 
   if (config.studyFormat === 'clinical_vignette') {
-    const qPerVignette = config.questionsPerVignette ?? 5;
     prompt += `
 
-CLINICAL VIGNETTE INSTRUCTIONS:
-- Create a realistic, paragraph-length client presentation with demographics, presenting problem, and relevant history.
-- Follow each vignette with exactly ${qPerVignette} questions testing different competency areas (diagnosis, treatment planning, ethics, risk assessment, cultural competence).
-- Each question should have 4 answer choices with detailed rationales for correct and incorrect answers.
-- Present nuanced cases with competing clinical priorities, reflecting actual exam complexity.
-- Ensure vignettes reflect diverse client populations and clinical settings.`;
+NCMHCE CLINICAL SIMULATION INSTRUCTIONS:
+You must generate content that mirrors the real NCMHCE two-phase simulation format.
+
+Each simulation must include:
+1. A realistic client presentation (150-300 words) with demographics, presenting problem, and relevant history.
+
+2. INFORMATION GATHERING PHASE (igPhase):
+   - A prompt asking the candidate what clinical actions they would take.
+   - 8-12 possible actions (assessments, inquiries, observations, interventions).
+   - Each action has a rating: "most_productive", "productive", "unproductive", or "counterproductive".
+   - Each action has a rationale explaining why it received that rating.
+   - Typically 2-3 actions are "most_productive", 3-4 are "productive", 2-3 are "unproductive", and 1-2 are "counterproductive".
+
+3. DECISION MAKING PHASE (dmPhase):
+   - A prompt referencing the information gathered.
+   - 3-5 clinical decision points testing diagnosis, treatment planning, ethics, risk assessment, and cultural competence.
+   - Each decision point has 4 choices (A-D) with rationales for correct and incorrect answers.
+
+Key requirements:
+- Present nuanced cases with competing clinical priorities.
+- Ensure diverse client populations and clinical settings.
+- Actions and decisions should reflect realistic clinical judgment, not textbook recall.
+- Counterproductive actions should represent plausible but harmful choices, not obviously wrong ones.`;
   }
 
   if (kbContext) {
@@ -130,16 +146,20 @@ Include detailed rationale for the correct answer and explanations for why each 
 Assign each question a unique id starting with "gen-".`;
 
     case 'clinical_vignette': {
-      const qPerVignette = config.questionsPerVignette ?? 5;
       return `${base}
-Generate exactly ${itemCount} clinical vignettes. Each vignette must include:
-- A realistic paragraph-length client presentation
-- Client demographics
-- Presenting problem
-- Relevant history
-- Exactly ${qPerVignette} follow-up questions testing different competency areas (diagnosis, treatment planning, ethics, risk assessment, cultural competence)
-Each question should have 4 choices with detailed rationales.
-Assign each vignette and question a unique id starting with "gen-".`;
+Generate exactly ${itemCount} NCMHCE-style clinical simulation(s). Each simulation must include:
+- "clientPresentation": A realistic paragraph-length client presentation (150-300 words)
+- "demographics": Client demographics summary
+- "presentingProblem": Primary presenting concern
+- "relevantHistory": Relevant clinical history
+- "igPhase": Information Gathering phase with:
+  - "prompt": Question asking what actions the clinician would take
+  - "actions": Array of 8-12 clinical actions, each with "id", "text", "rating" (most_productive|productive|unproductive|counterproductive), and "rationale"
+- "dmPhase": Decision Making phase with:
+  - "prompt": Context referencing gathered information
+  - "decisionPoints": Array of 3-5 decision points, each with "id", "questionText", "competencyArea", "choices" (A-D), "correctAnswer", "rationale", and "incorrectRationales"
+- "questions": Empty array [] (legacy field, phases replace it)
+Assign each simulation, action, and decision point a unique id starting with "gen-".`;
     }
 
     case 'flashcards':
