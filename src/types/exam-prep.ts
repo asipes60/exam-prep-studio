@@ -122,13 +122,53 @@ export interface ClinicalVignetteQuestion {
   incorrectRationales: { label: string; explanation: string }[];
 }
 
+// ─── NCMHCE Two-Phase Simulation Types ──────────────────────────────
+
+export type IGActionRating = 'most_productive' | 'productive' | 'unproductive' | 'counterproductive';
+
+/** An action the candidate can select during Information Gathering */
+export interface IGAction {
+  id: string;
+  text: string;
+  rating: IGActionRating;
+  rationale: string;
+}
+
+/** A decision point in the Decision Making phase */
+export interface DMDecisionPoint {
+  id: string;
+  questionText: string;
+  competencyArea: string;
+  choices: { label: string; text: string }[];
+  correctAnswer: string;
+  rationale: string;
+  incorrectRationales: { label: string; explanation: string }[];
+}
+
+/** Information Gathering phase for an NCMHCE simulation */
+export interface IGPhase {
+  prompt: string;
+  actions: IGAction[];
+}
+
+/** Decision Making phase for an NCMHCE simulation */
+export interface DMPhase {
+  prompt: string;
+  decisionPoints: DMDecisionPoint[];
+}
+
 export interface ClinicalVignette {
   id: string;
   clientPresentation: string;
   demographics: string;
   presentingProblem: string;
   relevantHistory: string;
+  /** Legacy: flat question list (used when igPhase/dmPhase are absent) */
   questions: ClinicalVignetteQuestion[];
+  /** NCMHCE two-phase: Information Gathering */
+  igPhase?: IGPhase;
+  /** NCMHCE two-phase: Decision Making */
+  dmPhase?: DMPhase;
 }
 
 export interface QuizResult {
@@ -136,6 +176,8 @@ export interface QuizResult {
   selectedAnswer: string;
   isCorrect: boolean;
   timeSpent: number;
+  /** For IG actions: the rating of the selected action */
+  igRating?: IGActionRating;
 }
 
 export interface QuizSession {
