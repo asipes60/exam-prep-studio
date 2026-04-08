@@ -21,6 +21,8 @@ export interface UserProfile {
   dailyGenerations: number;
   dailyGenerationsResetAt: string;
   isAdmin: boolean;
+  onboardingCompletedAt: string | null;
+  selectedExams: string[];
 }
 
 interface AuthContextValue {
@@ -42,7 +44,7 @@ async function fetchProfile(userId: string): Promise<UserProfile | null> {
     Promise.resolve(
       supabase
         .from('profiles')
-        .select('id, email, name, preferred_license, subscription_status, daily_generations, daily_generations_reset_at, is_admin')
+        .select('id, email, name, preferred_license, subscription_status, daily_generations, daily_generations_reset_at, is_admin, onboarding_completed_at, selected_exams')
         .eq('id', userId)
         .single()
     ),
@@ -61,6 +63,8 @@ async function fetchProfile(userId: string): Promise<UserProfile | null> {
     dailyGenerations: data.daily_generations,
     dailyGenerationsResetAt: data.daily_generations_reset_at,
     isAdmin: data.is_admin ?? false,
+    onboardingCompletedAt: data.onboarding_completed_at ?? null,
+    selectedExams: data.selected_exams ?? [],
   };
 }
 
@@ -148,7 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/`,
+        redirectTo: `${window.location.origin}/dashboard`,
       },
     });
     if (error) throw error;
