@@ -19,6 +19,7 @@ import ExamPrepStudyPlan from "./pages/exam-prep/ExamPrepStudyPlan";
 import ExamPrepUpgrade from "./pages/exam-prep/ExamPrepUpgrade";
 import ExamPrepOnboarding from "./pages/exam-prep/ExamPrepOnboarding";
 import ExamPrepDiagnostic from "./pages/exam-prep/ExamPrepDiagnostic";
+import ExamPrepSimulation from "./pages/exam-prep/ExamPrepSimulation";
 import AuthGuard from "./components/auth/AuthGuard";
 import AdminGuard from "./components/admin/AdminGuard";
 import AdminLayout from "./components/admin/AdminLayout";
@@ -62,6 +63,7 @@ function App() {
                     <Route path="/assessment" element={<ExamPrepAssessment />} />
                     <Route path="/diagnostic" element={<ExamPrepDiagnostic />} />
                     <Route path="/quiz" element={<ExamPrepQuiz />} />
+                    <Route path="/simulation" element={<ExamPrepSimulation />} />
                     <Route path="/saved" element={<ExamPrepSaved />} />
                   </Route>
                 </Route>
