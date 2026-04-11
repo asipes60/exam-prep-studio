@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { LicenseType, WeakAreaRating, StudyPlan, StudyFormat } from '@/types/exam-prep';
-import { Brain, ArrowRight, CheckCircle, AlertTriangle, Loader2, Sparkles, Calendar } from 'lucide-react';
+import { Brain, ArrowRight, CheckCircle, AlertTriangle, Loader2, Sparkles, Calendar, Target } from 'lucide-react';
 
 type AssessmentStep = 'choose' | 'rate' | 'results';
 
@@ -168,6 +168,31 @@ export default function ExamPrepAssessment() {
 
       {step === 'choose' && (
         <div className="space-y-6">
+          {/* Diagnostic CTA */}
+          <Card
+            className="border-2 border-blue-200 bg-blue-50/50 cursor-pointer transition-all hover:shadow-md hover:border-blue-300"
+            onClick={() => navigate('/diagnostic')}
+          >
+            <CardContent className="p-6 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+                <Target className="w-6 h-6 text-blue-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-blue-800 mb-0.5">Take the Diagnostic Quiz</h3>
+                <p className="text-sm text-blue-600">
+                  Answer 30 exam-level questions to precisely identify your weak areas.
+                </p>
+              </div>
+              <ArrowRight className="w-5 h-5 text-blue-400 shrink-0" />
+            </CardContent>
+          </Card>
+
+          <div className="text-center">
+            <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">
+              Or assess yourself manually
+            </p>
+          </div>
+
           {/* License Selection */}
           <Card className="border-slate-200">
             <CardContent className="p-6">
