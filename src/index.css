@@ -1,5 +1,4 @@
-
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -7,26 +6,39 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* EduCare brand tokens — sourced from logo + educarecomplete.com */
+    --background: 210 19% 96%;          /* #F2F5F7 page bg */
+    --foreground: 240 26% 14%;          /* #1A1A2E primary text */
+
+    --surface: 0 0% 100%;               /* #FFFFFF card surface */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 240 26% 14%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 240 100% 50%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 240 50% 95%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 240 50% 95%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 240 100% 50%;
-    --radius: 0.75rem;
+    --popover-foreground: 240 26% 14%;
+
+    --primary: 211 100% 41%;            /* #0064D1 EduCare cobalt */
+    --primary-foreground: 0 0% 100%;
+    --primary-dark: 230 53% 40%;        /* #2F419A header / hover */
+    --primary-light: 211 79% 94%;       /* #E6F0FB tinted surface */
+
+    --secondary: 211 79% 94%;           /* same as primary-light */
+    --secondary-foreground: 230 53% 40%;
+    --muted: 210 19% 93%;
+    --muted-foreground: 0 0% 33%;       /* #545454 secondary text */
+    --accent: 211 79% 94%;
+    --accent-foreground: 230 53% 40%;
+    --subtle: 240 8% 57%;               /* #8A8A99 helper text */
+
+    --destructive: 0 73% 51%;           /* #DC2626 */
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 71% 37%;             /* #16A34A */
+    --warning: 33 92% 44%;              /* #D97706 */
+
+    --border: 220 20% 91%;              /* #E2E6EE hairline */
+    --input: 220 20% 91%;
+    --ring: 211 100% 41%;               /* match primary */
+
+    --radius: 0.5rem;                   /* 8px to match live site */
   }
 
   * {
@@ -38,41 +50,46 @@
   }
 
   body {
-    @apply bg-background text-foreground font-inter;
+    @apply bg-background text-foreground font-poppins;
+  }
+
+  ::selection {
+    @apply bg-primary/20 text-foreground;
+  }
+
+  /* Visible focus ring on every keyboard-focused element */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
   }
 }
 
 @layer components {
-  .glass {
-    @apply backdrop-blur-lg bg-white/80 border border-white/20 shadow-lg;
-  }
-
   .container-custom {
     @apply container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl;
   }
 
   .heading-1 {
-    @apply font-montserrat text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight;
+    @apply font-montserrat text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-foreground;
   }
 
   .heading-2 {
-    @apply font-montserrat text-3xl md:text-4xl font-semibold tracking-tight;
+    @apply font-montserrat text-3xl md:text-4xl font-semibold tracking-tight text-foreground;
   }
 
   .heading-3 {
-    @apply font-montserrat text-2xl md:text-3xl font-semibold;
+    @apply font-montserrat text-2xl md:text-3xl font-semibold text-foreground;
   }
 
-  .card {
-    @apply rounded-xl bg-white shadow-lg hover:shadow-xl transition-all duration-300;
+  .card-soft {
+    @apply rounded-lg bg-surface border border-border shadow-sm hover:shadow-md transition-shadow duration-200;
   }
 
   .btn-primary {
-    @apply px-6 py-3 rounded-lg bg-primary text-white font-semibold hover:opacity-90 transition-opacity;
+    @apply px-6 py-3 rounded-lg bg-primary text-primary-foreground font-semibold hover:bg-[hsl(var(--primary-dark))] transition-colors;
   }
 
   .btn-secondary {
-    @apply px-6 py-3 rounded-lg border-2 border-primary text-primary font-semibold hover:bg-primary/10 transition-colors;
+    @apply px-6 py-3 rounded-lg border-2 border-primary text-primary font-semibold hover:bg-[hsl(var(--primary-light))] transition-colors;
   }
 }
 
@@ -95,8 +112,8 @@
   font-family: 'Montserrat', sans-serif;
 }
 
-.font-inter {
-  font-family: 'Inter', sans-serif;
+.font-poppins {
+  font-family: 'Poppins', sans-serif;
 }
 
 /* Print styles for Exam Prep Studio export */

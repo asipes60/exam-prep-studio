@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/use-auth';
 import { useDashboardData } from '@/hooks/use-dashboard-data';
@@ -6,6 +6,7 @@ import { EXAM_DATA } from '@/data/exam-prep-data';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -14,7 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { LicenseType } from '@/types/exam-prep';
-import { useExamPrep } from '@/contexts/ExamPrepContext';
+import { getAllActivePlansAsync, type ActivePlanData } from '@/lib/exam-prep-storage';
 import {
   BarChart3,
   Target,
@@ -33,7 +34,20 @@ export default function ExamPrepDashboard() {
   const navigate = useNavigate();
   const [license, setLicense] = useState<LicenseType | null>(null);
   const { data, loading } = useDashboardData(license);
-  const { activePlan } = useExamPrep();
+  const [allPlans, setAllPlans] = useState<ActivePlanData[]>([]);
+  const [plansLoading, setPlansLoading] = useState(false);
+
+  useEffect(() => {
+    if (!user) {
+      setAllPlans([]);
+      return;
+    }
+    setPlansLoading(true);
+    getAllActivePlansAsync(user.id)
+      .then(setAllPlans)
+      .catch((err) => console.warn('Failed to load active plans:', err))
+      .finally(() => setPlansLoading(false));
+  }, [user]);
 
   if (!isAuthenticated) {
     return (
@@ -53,16 +67,18 @@ export default function ExamPrepDashboard() {
   }
 
   return (
-    <div className="container-custom py-8 md:py-12 max-w-4xl">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="heading-2 text-slate-900 mb-1">Your Progress Dashboard</h1>
+    <div className="container-custom py-6 md:py-12 max-w-4xl">
+      <div className="flex flex-col gap-4 mb-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="font-montserrat font-semibold tracking-tight text-foreground text-2xl sm:text-3xl lg:text-4xl mb-1">
+            Your Progress Dashboard
+          </h1>
           <p className="text-slate-500 text-sm">
             Track your exam readiness by domain.
           </p>
         </div>
         <Select value={license || ''} onValueChange={(v) => setLicense(v as LicenseType)}>
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-full lg:w-[200px] shrink-0">
             <SelectValue placeholder="Select exam" />
           </SelectTrigger>
           <SelectContent>
@@ -75,11 +91,98 @@ export default function ExamPrepDashboard() {
         </Select>
       </div>
 
+      {/* Active Study Plans (cross-track, independent of the dropdown) */}
+      <section className="mb-8">
+        <h2 className="font-montserrat font-semibold text-slate-900 text-lg mb-3 flex items-center gap-2">
+          <CalendarDays className="w-4 h-4 text-primary" />
+          Active Study Plans
+        </h2>
+
+        {plansLoading ? (
+          <Card className="border-slate-200">
+            <CardContent className="p-8 flex items-center justify-center">
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+            </CardContent>
+          </Card>
+        ) : allPlans.length === 0 ? (
+          <Card className="border-slate-200">
+            <CardContent className="p-5 flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-slate-800 text-sm">No study plan yet</p>
+                <p className="text-xs text-slate-500">
+                  Take the assessment to get a personalized plan for any exam track.
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => navigate('/assessment')}>
+                <Brain className="w-3 h-3 mr-1" />
+                Start Assessment
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {allPlans.map((p) => {
+              const plan = p.suggestedPlan;
+              if (!plan) return null;
+              const totalWeeks = plan.weeklyPlan.length;
+              const completedCount = p.completedWeeks.length;
+              const percent =
+                totalWeeks > 0 ? Math.round((completedCount / totalWeeks) * 100) : 0;
+              const currentWeek = plan.weeklyPlan.find(
+                (w) => !p.completedWeeks.includes(w.week),
+              );
+              const examLabel = EXAM_DATA[p.licenseType]?.shortTitle ?? p.licenseType;
+              return (
+                <Card key={p.id} className="border-slate-200 min-w-0">
+                  <CardContent className="p-4 sm:p-5 min-w-0">
+                    <div className="flex items-start justify-between gap-3 mb-3 min-w-0">
+                      <div className="min-w-0 flex-1">
+                        <Badge className="bg-primary-light text-primary-dark border-0 text-[11px] font-medium mb-1.5">
+                          {examLabel}
+                        </Badge>
+                        <p className="text-sm font-semibold text-slate-900 line-clamp-2 break-words">
+                          {currentWeek
+                            ? `Week ${currentWeek.week}: ${currentWeek.focus}`
+                            : 'All weeks completed'}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-sm font-semibold text-primary-dark">
+                        {percent}%
+                      </span>
+                    </div>
+                    <Progress value={percent} className="h-2 mb-3" />
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-slate-500 truncate">
+                        {completedCount}/{totalWeeks} weeks completed
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-primary-dark text-xs h-7 px-2 shrink-0"
+                        onClick={() => {
+                          setLicense(p.licenseType);
+                          navigate('/plan');
+                        }}
+                      >
+                        {currentWeek ? 'Continue' : 'Review'}
+                        <ArrowRight className="w-3 h-3 ml-1" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
       {!license && (
         <Card className="border-slate-200">
-          <CardContent className="p-12 text-center">
-            <Target className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500">Select an exam above to view your progress.</p>
+          <CardContent className="p-6 sm:p-10 text-center">
+            <Target className="w-8 h-8 sm:w-10 sm:h-10 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500 text-sm">
+              Select an exam above to view your progress by domain.
+            </p>
           </CardContent>
         </Card>
       )}
@@ -133,75 +236,6 @@ export default function ExamPrepDashboard() {
               </CardContent>
             </Card>
           </div>
-
-          {/* Study Plan Card */}
-          {activePlan && (
-            <Card className="border-indigo-200 bg-indigo-50/30">
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-semibold text-indigo-800 flex items-center gap-2">
-                    <CalendarDays className="w-4 h-4" />
-                    Your Study Plan
-                  </h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-indigo-600 text-xs"
-                    onClick={() => navigate('/plan')}
-                  >
-                    View Full Plan <ArrowRight className="w-3 h-3 ml-1" />
-                  </Button>
-                </div>
-                {(() => {
-                  const completedWeeks = activePlan.completedWeeks ?? [];
-                  const currentWeek = activePlan.plan.weeklyPlan.find(
-                    (w) => !completedWeeks.includes(w.week),
-                  );
-                  if (!currentWeek) {
-                    return (
-                      <p className="text-sm text-emerald-700 font-medium">
-                        All weeks completed! Take a quiz to test your readiness.
-                      </p>
-                    );
-                  }
-                  return (
-                    <div>
-                      <p className="text-sm text-slate-700 mb-1">
-                        <span className="font-medium">Week {currentWeek.week}:</span>{' '}
-                        {currentWeek.focus}
-                      </p>
-                      <p className="text-xs text-slate-500 mb-3">
-                        {completedWeeks.length}/{activePlan.plan.weeklyPlan.length} weeks completed
-                      </p>
-                      <Button
-                        size="sm"
-                        className="bg-indigo-600 hover:bg-indigo-700 text-xs"
-                        onClick={() => navigate('/plan')}
-                      >
-                        <Sparkles className="w-3 h-3 mr-1" />
-                        Continue Studying
-                      </Button>
-                    </div>
-                  );
-                })()}
-              </CardContent>
-            </Card>
-          )}
-
-          {!activePlan && (
-            <Card className="border-slate-200">
-              <CardContent className="p-5 flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-slate-800 text-sm">No study plan yet</p>
-                  <p className="text-xs text-slate-500">Take the assessment to get a personalized plan.</p>
-                </div>
-                <Button size="sm" variant="outline" onClick={() => navigate('/assessment')}>
-                  <Brain className="w-3 h-3 mr-1" />
-                  Assess
-                </Button>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Domain Progress Bars */}
           <Card className="border-slate-200">

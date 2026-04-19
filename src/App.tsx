@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import { AuthProvider } from "./hooks/use-auth";
 import { ExamPrepProvider } from "./contexts/ExamPrepContext";
@@ -21,6 +21,9 @@ import ExamPrepOnboarding from "./pages/exam-prep/ExamPrepOnboarding";
 import ExamPrepDiagnostic from "./pages/exam-prep/ExamPrepDiagnostic";
 import ExamPrepSimulation from "./pages/exam-prep/ExamPrepSimulation";
 import ExamPrepFlashcards from "./pages/exam-prep/ExamPrepFlashcards";
+import ExamPrepPrivacy from "./pages/exam-prep/ExamPrepPrivacy";
+import ExamPrepTerms from "./pages/exam-prep/ExamPrepTerms";
+import ExamPrepDisclaimers from "./pages/exam-prep/ExamPrepDisclaimers";
 import AuthGuard from "./components/auth/AuthGuard";
 import AdminGuard from "./components/admin/AdminGuard";
 import AdminLayout from "./components/admin/AdminLayout";
@@ -28,6 +31,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminKnowledgeBase from "./pages/admin/AdminKnowledgeBase";
 import AdminAuditLog from "./pages/admin/AdminAuditLog";
 import NotFound from "./pages/NotFound";
+import ScrollToTop from "./components/ScrollToTop";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -45,6 +49,7 @@ function App() {
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <ScrollToTop />
             <AuthProvider>
             <ExamPrepProvider>
               <Routes>
@@ -53,13 +58,20 @@ function App() {
                   <Route path="/" element={<ExamPrepLanding />} />
                   <Route path="/auth" element={<ExamPrepAuth />} />
                   <Route path="/upgrade" element={<ExamPrepUpgrade />} />
+                  <Route path="/account/upgrade" element={<ExamPrepUpgrade />} />
+                  <Route path="/privacy" element={<ExamPrepPrivacy />} />
+                  <Route path="/terms" element={<ExamPrepTerms />} />
+                  <Route path="/disclaimers" element={<ExamPrepDisclaimers />} />
                 </Route>
                 {/* Authenticated routes */}
                 <Route element={<AuthGuard />}>
                   <Route element={<ExamPrepLayout />}>
                     <Route path="/onboarding" element={<ExamPrepOnboarding />} />
-                    <Route path="/dashboard" element={<ExamPrepDashboard />} />
+                    <Route path="/today" element={<ExamPrepDashboard />} />
+                    <Route path="/dashboard" element={<Navigate to="/today" replace />} />
                     <Route path="/plan" element={<ExamPrepStudyPlan />} />
+                    <Route path="/study" element={<Navigate to="/generator" replace />} />
+                    <Route path="/account" element={<Navigate to="/account/upgrade" replace />} />
                     <Route path="/generator" element={<ExamPrepGenerator />} />
                     <Route path="/assessment" element={<ExamPrepAssessment />} />
                     <Route path="/diagnostic" element={<ExamPrepDiagnostic />} />
