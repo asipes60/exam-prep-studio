@@ -1,4 +1,46 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # EduCare Exam Prep — Project Instructions
+
+## Common Commands
+
+```bash
+npm run dev        # Vite dev server on http://localhost:3000
+npm run build      # Production build to dist/
+npm run preview    # Preview the production build locally
+npm run lint       # ESLint across the repo
+```
+
+**No test runner is configured** (no Jest/Vitest/Playwright in `package.json`). Don't go hunting for one — add it explicitly if tests are needed.
+
+**Path alias:** `@/*` resolves to `src/*` (configured in `vite.config.ts` and `tsconfig.json`). Use `@/lib/...`, `@/components/...`, etc. in imports.
+
+**Supabase Edge Functions** (deployed separately from the frontend):
+```bash
+supabase functions deploy generate         # Gemini AI generation
+supabase functions deploy checkout         # Stripe Checkout session
+supabase functions deploy stripe-webhook   # Subscription sync (uses service role)
+supabase functions deploy billing-portal   # Stripe billing portal
+
+supabase secrets set GEMINI_API_KEY=...    # Set function secrets
+supabase db push                           # Apply migrations in supabase/migrations/
+```
+
+**Vercel:** auto-deploys on push to `master`. Set production env vars with `vercel env add VAR_NAME production`, then redeploy.
+
+---
+
+## Database Access Pattern (Critical Invariant)
+
+The codebase enforces a strict split between client and server Supabase access — violating this breaks RLS:
+
+- **Client (browser):** uses `VITE_SUPABASE_ANON_KEY` with the authenticated user's JWT. All reads/writes go through RLS policies. Never put the service role key in any `VITE_*` variable.
+- **Edge functions:** use the anon key + user JWT for user-scoped operations (`generate`, `checkout`, `billing-portal`). Only `stripe-webhook` uses `SUPABASE_SERVICE_ROLE_KEY`, because Stripe calls it unauthenticated and it must write to the `subscriptions` table on the user's behalf.
+- AI API keys (Gemini) and Stripe secret keys live only in Supabase Edge Function secrets — never in the frontend bundle.
+
+---
 
 ## Product Overview
 
@@ -279,12 +321,15 @@ Build in this order:
 
 1. ~~**Project scaffolding** — Vite + React + Tailwind + Supabase setup~~ ✅
 2. ~~**Auth flow** — Email/password + Google OAuth, AuthGuard, AdminGuard~~ ✅
-3. **Onboarding flow** — License selection wizard (in progress), exam track auto-mapping, pathway choice
+3. ~~**Onboarding flow** — 3-step license selection wizard, exam track auto-mapping, pathway choice~~ ✅
 4. ~~**CA Law & Ethics exam track first** — MCQ generator, flashcard generator, quiz engine~~ ✅
 5. ~~**Study plan generator** — Self-assessment driven, 6–8 week AI-generated plans~~ ✅
 6. ~~**Dashboard** — Domain scores, readiness score, quiz history, study plan view~~ ✅
-7. **Remaining exam tracks** — MFT Clinical, NCMHCE (with simulation mode), ASWB Clinical
-8. **Adaptive features** — Plan adjustment based on performance, weak area detection
+7. ~~**Remaining exam tracks** — MFT Clinical, NCMHCE two-phase simulation (IG + DM), ASWB Clinical~~ ✅
+8. ~~**Diagnostic assessment + flashcard study mode**~~ ✅
+9. **Adaptive features** — Study plan adjustment based on quiz performance, weak area detection (in progress)
+10. **Launch blockers** — Privacy Policy, Terms of Service, formal disclaimers, custom domain, Stripe production config
+11. **Marketing** — LearnWorlds waitlist + Kit (ConvertKit) automation, SEO marketing page
 
 ---
 
@@ -299,10 +344,6 @@ Build in this order:
 
 ## Reference Documents
 
-The `/docs` directory contains EduCare reference materials. These are for context about the company and its standards — they are NOT the content source for exam prep material. The AI must generate exam prep content based on its training knowledge of California law, ethics codes, DSM-5-TR, and clinical practice, not by summarizing these documents.
+The numbered folders at the repo root (`01_California_Law_and_Ethics/` through `06_Free_Resources/`) contain EduCare's internal study reference material, indexed by `INDEX.md`. `AI_REFERENCE_PROMPT.md` documents the AI curriculum generation approach.
 
-Key references:
-- `SKILL.md` — EduCare's course production system (useful for content quality standards)
-- `PROJECT_CONTEXT_PACK.docx` — Full company context
-- `nbcc_continuing_education_provider_policy.pdf` — NBCC ACEP policy (relevant for NCMHCE track accuracy)
-- `EduCare_Logo.png` — Brand asset
+These are for human/context reference. The AI generation pipeline does NOT summarize or retrieve from these files at runtime — it generates content from the model's training knowledge plus the `admin_knowledge_base` Supabase table (see `src/lib/kb-retrieval.ts`). To add verified content into AI prompts, seed `admin_knowledge_base` via the admin panel, not by pointing the generator at these folders.

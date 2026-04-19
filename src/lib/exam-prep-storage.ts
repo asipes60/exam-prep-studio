@@ -390,6 +390,41 @@ export async function getLatestAssessmentAsync(
   };
 }
 
+/**
+ * Return the latest active study plan per license track for a user.
+ * One entry per LicenseType, most recent assessment row where suggested_plan is not null.
+ */
+export async function getAllActivePlansAsync(
+  userId: string,
+): Promise<ActivePlanData[]> {
+  const { data, error } = await supabase
+    .from('exam_prep_assessments')
+    .select('id, license_type, suggested_plan, weak_areas, strong_areas, completed_weeks, created_at')
+    .eq('user_id', userId)
+    .not('suggested_plan', 'is', null)
+    .order('created_at', { ascending: false });
+
+  if (error || !data) return [];
+
+  const seen = new Set<string>();
+  const latestPerLicense: ActivePlanData[] = [];
+  for (const row of data) {
+    const license = row.license_type as LicenseType;
+    if (seen.has(license)) continue;
+    seen.add(license);
+    latestPerLicense.push({
+      id: row.id,
+      licenseType: license,
+      suggestedPlan: row.suggested_plan as unknown as StudyPlan | null,
+      weakAreas: row.weak_areas ?? [],
+      strongAreas: row.strong_areas ?? [],
+      completedWeeks: row.completed_weeks ?? [],
+      createdAt: row.created_at,
+    });
+  }
+  return latestPerLicense;
+}
+
 export async function toggleWeekCompleted(
   assessmentId: string,
   weekNumber: number,
